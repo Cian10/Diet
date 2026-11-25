@@ -1,0 +1,14 @@
+.build/
+.build-native/
+.build-native-swiftdata/
+.swiftpm/
+.tooling-home/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+.DS_Store
+
+# Local Codex and brainstorming artifacts
+.codex/
+.superpowers/

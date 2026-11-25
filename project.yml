@@ -1,0 +1,47 @@
+name: DietApp
+options:
+  bundleIdPrefix: com.yuzhao
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) DIETAPP_SWIFTDATA"
+targets:
+  DietCore:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Sources/DietCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yuzhao.DietCore
+        GENERATE_INFOPLIST_FILE: YES
+  DietFeatures:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Sources/DietFeatures
+    dependencies:
+      - target: DietCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yuzhao.DietFeatures
+        GENERATE_INFOPLIST_FILE: YES
+  DietApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    dependencies:
+      - target: DietCore
+        embed: true
+      - target: DietFeatures
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yuzhao.DietApp
+        PRODUCT_NAME: DietApp
+        INFOPLIST_FILE: App/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic

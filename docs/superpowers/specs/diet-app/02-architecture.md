@@ -2,13 +2,13 @@
 
 ## 技术选择
 
-- UI：SwiftUI。
+- UI：SwiftUI；macOS 主外壳使用 `NavigationSplitView`，最低部署目标为 macOS 14。
 - 本地持久化：SwiftData。
 - 图表：Swift Charts。
-- 图片输入：PhotosUI 与系统相机能力。
+- 图片输入：macOS `NSPasteboard`、SwiftUI `fileImporter` 与 ImageIO。
 - 提醒：UserNotifications。
 - 密钥：Keychain。
-- 可选扩展：HealthKit，仅在后续阶段实现。
+- 健康平台接入不属于当前 macOS 迁移范围。
 
 默认不引入远程后端。网络请求只用于用户主动发起的 LLM 分析和后续明确选择的营养数据服务。
 
@@ -17,7 +17,7 @@
 ```text
 UI 层
 ├── 今天、日记、趋势、我的
-├── 文本/拍照记录流程
+├── 文本/图片记录流程
 └── 识别确认、目标设置与调整确认
 
 领域层
@@ -31,7 +31,7 @@ UI 层
 ├── LLMService：统一文本与图片请求
 ├── NutritionRepository：食物营养数据来源
 ├── ImageService：本地图片和上传副本
-└── HealthKitService：后续可选
+└── DesktopImageImporter：文件与剪贴板图片输入
 
 数据层
 ├── SwiftData
