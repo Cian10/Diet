@@ -1,83 +1,95 @@
-# 健身饮食 macOS App
+<div align="center">
 
-个人 macOS 健身饮食记录项目。技术栈保持 SwiftUI + SwiftData，本地优先，自行配置兼容文本和图片理解的 LLM API。
+# 健身饮食 · DietApp
 
-- 当前交付目标：macOS 14 及以上。
-- 用户本机：macOS 27.2.1；高于部署目标的系统可以运行该应用。
-- macOS 主导航为“今天、日记、趋势、我的”侧栏。
-- 图片记录支持本地文件、截图／图片剪贴板以及 Finder 复制的图片文件。
-- iOS 条件编译代码仅作为历史兼容保留，不属于当前生成和交付目标。
+**一个本地优先的 macOS 健身饮食记录与营养追踪应用。**
 
-## 设计文档
+用自然语言或照片记录一餐；AI 只生成待确认的候选结果，营养计算与数据保存留在本机，最终由你确认后写入。
 
-- [总索引](docs/superpowers/specs/diet-app/2026-11-10-diet-app-design.md)
-- [macOS 桌面版迁移设计](docs/superpowers/specs/diet-app/14-macos-desktop.md)
-- [macOS 迁移实施计划](docs/superpowers/plans/2026-11-19-macos-migration.md)
-- [实施状态与验证边界](docs/implementation-status.md)
+![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-111827)
+![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)
+![UI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
+![Data](https://img.shields.io/badge/Data-SwiftData-34C759)
+![Status](https://img.shields.io/badge/status-MVP-orange)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## 工程结构
+<img src="docs/images/readme-today.png" width="920" alt="DietApp 今天页面">
 
-```text
-App/                     macOS App 入口与 Info.plist
-Sources/DietCore/        模型、营养/目标引擎、LLM、记录、图片和 SwiftData 适配
-Sources/DietFeatures/    桌面导航、今日、日记、趋势、档案、确认页和文本/图片记录
-Tests/                   领域服务、数据不变量、表单和桌面图片导入测试
-project.yml              XcodeGen macOS 工程描述
-```
+</div>
 
-业务规则不依赖具体 UI 或数据库。默认 SwiftPM 测试使用内存仓库；macOS 工程定义 `DIETAPP_SWIFTDATA`，启用相同领域模型上的 SwiftData 宏和持久化仓库。
+## 项目简介
 
-## 当前功能
+DietApp 面向增肌、减脂、维持和休息／恢复阶段的日常饮食管理。它不把 AI 识别结果直接当成最终数据，而是将文本或照片转换为结构化草稿，再由用户修正份量、营养和餐别后确认保存。
 
-- 首次录入身体信息、活动水平、饮食偏好、忌口和过敏食物；可留空的身体数据不会生成虚假的自动目标。
-- 创建增肌、减脂、维持、休息／恢复阶段，保留历史目标和独立体重记录。
-- 本地计算克、毫升和份的营养摄入；未知项目不会被当成零。
-- 使用 Mifflin–St Jeor 和活动系数生成目标建议，用户确认后保存。
-- 分别展示目标差额和实际热量缺口，修改份量后重新计算。
-- 配置 OpenAI 兼容 Chat Completions API，API Key 存入 Keychain。
-- 文本分析、失败重试、手动回退、食物确认和营养修正。
-- 从文件或剪贴板导入图片，本地保存原图并生成压缩 JPEG 上传副本；识别仍使用原确认页。
-- 日记、七日趋势、规则推荐、周期复盘和待确认调整建议。
+> **核心原则：模型负责提取候选信息，本地负责计算与保存，用户负责最终确认。**
 
-## 运行测试
+这带来三个直接结果：
+
+- **可解释**：保留原始输入、估算依据、缺失信息和用户修正，而不是只显示一个不可追溯的热量数字。
+- **本地优先**：档案、饮食记录、目标和图片默认保存在本机，不接入云同步、广告或行为统计。
+- **不制造精确感**：份量未知时显示范围或缺失状态，不把无法计算的营养值当作 `0`。
+
+## 核心功能
+
+- **个人档案与健身阶段**：记录身体信息、活动水平、饮食偏好、忌口和过敏食物；支持增肌、减脂、维持及休息／恢复阶段，并保留历史目标。
+- **自然语言记录**：用一句话描述一餐，生成食物候选项、份量估算和营养草稿，再进入确认流程。
+- **图片记录**：从文件或剪贴板导入食物图片，本地保存原图，并生成压缩 JPEG 上传副本；识别仍复用同一确认页。
+- **识别与估算透明**：支持失败重试、补充信息、手动回退、食物拆分、份量及营养修正。
+- **营养与目标计算**：在本地计算克、毫升和份的营养；使用 Mifflin–St Jeor 与活动系数生成目标建议，用户确认后保存。
+- **饮食日记**：按日期和餐次查看记录及每日汇总；已有记录可以编辑、重新确认或删除。
+- **七日趋势**：展示每日摄入、目标参考、记录完整度和体重变化，避免用单日波动推断长期趋势。
+- **推荐与复盘**：根据本地规则生成饮食改善建议，并在周期复盘中提出待确认的目标调整。
+- **桌面体验**：原生 macOS 侧栏、宽窄窗口自适应布局、浅色／深色主题和可访问语义。
+
+## 记录流程
+
+1. 选择餐别和时间，输入一段文字或导入一张图片。
+2. 用户主动发起请求，由所配置的 OpenAI 兼容模型返回结构化 JSON。
+3. App 校验字段、单位、数值范围和缺失信息，必要时要求一次澄清。
+4. 用户核对食物、份量、估算依据和营养值，可手动修改或补充。
+5. 用户确认后，记录写入本机 SwiftData；未知营养继续显示为缺失，而不是 `0`。
+
+只有用户点击分析时才会上传文本或图片。图片上传前会压缩为最长边 1600 px 的 JPEG，原始图片仍保存在本机。
+
+## 界面预览
+
+| 饮食日记 | 七日趋势 |
+| --- | --- |
+| <img src="docs/images/readme-diary.png" width="520" alt="DietApp 日记页面"> | <img src="docs/images/readme-trends.png" width="520" alt="DietApp 趋势页面"> |
+
+截图使用合成数据，不包含真实个人记录。
+
+## 快速开始
+
+### 环境要求
+
+- macOS 14 或更高版本
+- 完整安装的 Xcode
+- 可选：XcodeGen 2.4x，仅在需要从 `project.yml` 重新生成工程时使用
+
+仓库已包含生成后的 `DietApp.xcodeproj`，通常可以直接打开。当前项目使用 Swift 5.9，并已在 Xcode 27.2 上完成 Debug 构建；如果工程版本无法打开，请升级 Xcode，或使用 XcodeGen 重新生成。
+
+### 在 Xcode 中运行
 
 ```bash
-./Scripts/test.sh
-# 额外启用真实 SwiftData 宏和持久化测试
-./Scripts/test.sh --swiftdata
+# 从 GitHub 克隆或下载本仓库后，在仓库根目录执行
+open DietApp.xcodeproj
 ```
 
-测试脚本显式使用 SwiftPM `native` 构建系统和独立构建目录，避免新版 `swiftbuild` 与旧构建产物混用。2026-11-20：默认模式 **61 项测试通过**，`--swiftdata` 模式 **63 项测试通过**，目标均为 `arm64e-apple-macos14.0`。
+1. 选择 `DietApp` scheme。
+2. 运行目标选择 **My Mac**。
+3. 本机开发可选择 **Sign to Run Locally**，不需要 Apple Developer 团队签名。
 
-如果苹果命令行工具更新后提示尚未同意许可，需要用户本人在终端完成：
-
-```bash
-sudo xcodebuild -license accept
-```
-
-默认测试覆盖领域逻辑、SwiftUI 编译和纯数据图片导入，不访问真实剪贴板，也不调用真实 LLM 供应商。没有完整 Xcode 时，不声称覆盖 SwiftData 宏、应用重启持久化、Keychain 或 App UI。
-
-## 生成并运行 macOS 工程
-
-前置条件：完整 Xcode、XcodeGen，以及已同意的 Apple SDK 许可。最低部署目标保持 macOS 14，不需要把部署目标改为 macOS 27。
+如果修改了 `project.yml` 或需要重新生成工程：
 
 ```bash
-# 未安装 XcodeGen 时，可在具备 Homebrew 的环境中执行：brew install xcodegen
+# 未安装 XcodeGen 时执行：brew install xcodegen
 ./Scripts/generate-project.sh
 open DietApp.xcodeproj
 ```
 
-在 Xcode 中选择 `DietApp` scheme 和 **My Mac**。个人本机运行可以选择 **Sign to Run Locally**，不需要连接 iPhone，也不需要相机或相册权限。
-
-当前已检测到 Xcode 27.2，并使用仓库 `.tooling-home` 中的 XcodeGen 2.48.0 实际生成 `DietApp.xcodeproj`。生成脚本会优先使用系统 XcodeGen，并自动回退到该本地工具。
-
-完整 macOS Debug 构建已通过，ad-hoc 签名验证通过，应用已实际启动并显示首次设置界面。构建产物位于：
-
-```text
-DerivedData/Build/Products/Debug/DietApp.app
-```
-
-如需从命令行重新构建本机签名版本：
+<details>
+<summary>命令行 Debug 构建</summary>
 
 ```bash
 xcodebuild -project DietApp.xcodeproj \
@@ -92,11 +104,90 @@ xcodebuild -project DietApp.xcodeproj \
   build
 ```
 
-后续人工验收项目：
+</details>
 
-1. 首次设置、退出重开后的 SwiftData 数据和 Keychain。
-2. 文件选择、截图粘贴、Finder 图片文件粘贴、取消选择和非法图片。
-3. 真实供应商的文本／图片请求、失败重试及离线手动记录。
-4. 窗口缩放、深色模式、本地通知和完整确认流程。
+## 配置模型服务
 
-完整验收清单见 [macOS 桌面版迁移设计](docs/superpowers/specs/diet-app/14-macos-desktop.md)。
+打开应用后进入 **我的 → 模型设置**，填写：
+
+- **Base URL**：兼容 OpenAI Chat Completions 的接口地址；可以填写到 `/v1`，也可以填写完整的 `/chat/completions` 地址。
+- **模型名称**：供应商实际提供的模型 ID。
+- **API Key**：仅保存在 macOS Keychain，不写入源码或普通设置文件。
+
+图片记录需要所选供应商与模型支持 Chat Completions 多模态图片输入。设置页的“保存并用一个苹果测试”会发起一次真实请求，可能产生少量费用。
+
+## 测试
+
+```bash
+# 默认测试：领域逻辑、SwiftUI 编译和纯数据图片导入
+./Scripts/test.sh
+
+# 额外启用 SwiftData 宏与持久化测试
+./Scripts/test.sh --swiftdata
+```
+
+默认测试使用内存仓库，不访问真实剪贴板，也不调用真实模型供应商。测试脚本使用独立构建目录，避免与本地构建产物混用。
+
+## 工程结构
+
+```text
+App/                       macOS App 入口与 Info.plist
+Sources/DietCore/          领域模型、营养与目标引擎、LLM 客户端、持久化、图片和复盘
+Sources/DietFeatures/      SwiftUI 页面、导航、设计系统与功能 ViewModel
+Tests/                     DietCore 与 DietFeatures 的自动化测试
+Scripts/                   工程生成与测试脚本
+docs/                      产品、架构、UI、隐私和实施方案文档
+project.yml                XcodeGen 工程描述
+DietApp.xcodeproj          已生成的 Xcode 工程，可直接打开
+```
+
+### 技术栈
+
+- Swift 5.9
+- SwiftUI
+- SwiftData
+- Swift Package Manager
+- XcodeGen
+- macOS Keychain
+- OpenAI 兼容 Chat Completions API
+
+架构上将不依赖具体 UI 或数据库的业务规则放在 `DietCore`，将桌面界面放在 `DietFeatures`。默认 SwiftPM 测试使用内存仓库；macOS App 通过 `DIETAPP_SWIFTDATA` 编译条件启用相同领域模型上的 SwiftData 持久化。
+
+## 隐私与安全
+
+- 身体数据、饮食记录、目标和图片默认仅保存在本机。
+- 不接入广告、第三方行为统计或默认遥测，也不包含云同步。
+- 只有用户主动发起分析时，相关文本或压缩图片才发送给其配置的模型供应商。
+- API Key 使用 Keychain 保存，不写入源码、普通偏好字段、日志或剪贴板。
+- 只有用户执行粘贴时才读取剪贴板，不监听剪贴板变化。
+- 所有外部响应都按不可信输入处理，并校验结构、类型、单位和数值范围。
+
+本项目是个人饮食记录与估算工具，不是医疗设备，不提供诊断或治疗建议。模型估算可能不准确，营养数据应优先以包装标签、实际称重或专业来源为准。
+
+## 当前状态
+
+当前处于 **MVP 开发阶段**，核心记录、计算、日记、趋势和复盘流程已可运行。发布或公开分发前仍需完成：
+
+- 真实模型供应商的文本与图片端到端验收
+- 应用重启后的 SwiftData 和 Keychain 持久化验收
+- 本地通知、完整键盘导航和 VoiceOver 人工验收
+- Developer ID 签名、公证与正式分发流程
+- 数据导出和备份恢复
+
+详细验证边界见 [实施状态与验证说明](docs/implementation-status.md)。
+
+## 设计文档
+
+- [产品范围与核心场景](docs/superpowers/specs/diet-app/01-product-scope.md)
+- [技术架构](docs/superpowers/specs/diet-app/02-architecture.md)
+- [数据模型](docs/superpowers/specs/diet-app/03-data-model.md)
+- [隐私、安全与可靠性](docs/superpowers/specs/diet-app/12-privacy-reliability.md)
+- [测试与交付](docs/superpowers/specs/diet-app/13-testing-delivery.md)
+- [macOS 桌面版迁移设计](docs/superpowers/specs/diet-app/14-macos-desktop.md)
+- [完整设计索引](docs/superpowers/specs/diet-app/2026-11-10-diet-app-design.md)
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。
+
+Copyright (c) 2026 Yuzhao
