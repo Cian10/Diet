@@ -58,6 +58,7 @@
 		DC5FE374993D65722BB09441 /* DietLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D39408AEF5D986CC31220CC /* DietLayout.swift */; };
 		DCAE9F80F3276B307B64B2D4 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF348DA7B5BB67B086A3DAF /* OnboardingView.swift */; };
 		DDDCBD42E57F05F0492D2583 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB68035558AC693010F0E39 /* ProfileService.swift */; };
+		E7B1A83EFBA6FECB62CB48AE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A072D5D6A2BE452CBC539882 /* Assets.xcassets */; };
 		EF7BB346725A55E2CA582BCC /* MealConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90586FC98EDCE43D439EAE5E /* MealConfirmationView.swift */; };
 		F8BDAFFF20C30C9A8BB547ED /* PhasePlanFormFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09326DDA65F8161EB05EC69 /* PhasePlanFormFields.swift */; };
 		F9632EBC913B9F485B9EFC44 /* DietStates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B869B7E43FD08525F3BEC76 /* DietStates.swift */; };
@@ -136,6 +137,7 @@
 		97857698FCA8E6261EE5BCF2 /* ProfileFormFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileFormFields.swift; sourceTree = "<group>"; };
 		997A17418D0493639F59382A /* ProfileRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRootView.swift; sourceTree = "<group>"; };
 		9C115FD66EBBC66514AF5B9F /* DomainEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainEnums.swift; sourceTree = "<group>"; };
+		A072D5D6A2BE452CBC539882 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ACF111CEA7CB96C2C7C4C8D1 /* ReviewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewModels.swift; sourceTree = "<group>"; };
 		B09326DDA65F8161EB05EC69 /* PhasePlanFormFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhasePlanFormFields.swift; sourceTree = "<group>"; };
 		BAF348DA7B5BB67B086A3DAF /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -212,6 +214,7 @@
 		19C925E073963527161E30B0 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				A072D5D6A2BE452CBC539882 /* Assets.xcassets */,
 				402D963B83363C0556C61B45 /* DietApp.swift */,
 				1E7E4007D8E72C493E81F17E /* Info.plist */,
 			);
@@ -440,6 +443,7 @@
 			buildConfigurationList = A9FE5F45D496E37C15FE2E8B /* Build configuration list for PBXNativeTarget "DietApp" */;
 			buildPhases = (
 				531378662696EC8E77D4F7EE /* Sources */,
+				7641391F048D71C026038DFA /* Resources */,
 				66B177BF4E96561520621910 /* Frameworks */,
 				B42E3693F05A1642593DC80D /* Embed Frameworks */,
 			);
@@ -526,6 +530,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7641391F048D71C026038DFA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E7B1A83EFBA6FECB62CB48AE /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		25EF118303D16DFEBD274972 /* Sources */ = {
