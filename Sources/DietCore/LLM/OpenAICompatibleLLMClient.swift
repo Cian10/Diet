@@ -12,10 +12,51 @@ public struct OpenAICompatibleLLMClient: LLMClient {
     }
 
     public func analyzeFood(_ request: FoodUnderstandingRequest) async throws -> FoodUnderstandingResult {
-        guard let endpoint = configuration.chatCompletionsURL else { throw LLMError.invalidConfiguration }
         guard request.text != nil || request.imageData != nil else {
             throw LLMError.invalidResponse("文本和图片不能同时为空。")
         }
+        let content = try await complete(
+            messages: foodMessages(for: request),
+            responseFormat: ResponseFormat(type: "json_object")
+        )
+        let json = Self.stripCodeFence(content)
+        guard let jsonData = json.data(using: .utf8) else {
+            throw LLMError.invalidResponse("模型文本不是 UTF-8。")
+        }
+        do {
+            return try JSONDecoder().decode(FoodUnderstandingResult.self, from: jsonData).validated()
+        } catch let error as LLMError {
+            throw error
+        } catch {
+            throw LLMError.invalidResponse("结构化 JSON 解析失败：\(error.localizedDescription)")
+        }
+    }
+
+    public func generateText(_ request: TextGenerationRequest) async throws -> String {
+        let systemPrompt = request.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let userPrompt = request.userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !systemPrompt.isEmpty, !userPrompt.isEmpty else {
+            throw LLMError.invalidResponse("纯文本生成提示词不能为空。")
+        }
+        let content = try await complete(
+            messages: [
+                ChatMessageRequest(role: "system", content: .text(systemPrompt)),
+                ChatMessageRequest(role: "user", content: .text(userPrompt))
+            ],
+            responseFormat: nil
+        )
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw LLMError.invalidResponse("模型返回了空文本。")
+        }
+        return trimmed
+    }
+
+    private func complete(
+        messages: [ChatMessageRequest],
+        responseFormat: ResponseFormat?
+    ) async throws -> String {
+        guard let endpoint = configuration.chatCompletionsURL else { throw LLMError.invalidConfiguration }
 
         var urlRequest = URLRequest(url: endpoint)
         urlRequest.httpMethod = "POST"
@@ -24,8 +65,8 @@ public struct OpenAICompatibleLLMClient: LLMClient {
         urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         urlRequest.httpBody = try JSONEncoder().encode(ChatRequest(
             model: configuration.model,
-            messages: messages(for: request),
-            responseFormat: ResponseFormat(type: "json_object")
+            messages: messages,
+            responseFormat: responseFormat
         ))
 
         var lastError: Error?
@@ -51,17 +92,7 @@ public struct OpenAICompatibleLLMClient: LLMClient {
                 guard let content = chatResponse.choices.first?.message.content else {
                     throw LLMError.invalidResponse("响应中没有 message.content。")
                 }
-                let json = Self.stripCodeFence(content)
-                guard let jsonData = json.data(using: .utf8) else {
-                    throw LLMError.invalidResponse("模型文本不是 UTF-8。")
-                }
-                do {
-                    return try JSONDecoder().decode(FoodUnderstandingResult.self, from: jsonData).validated()
-                } catch let error as LLMError {
-                    throw error
-                } catch {
-                    throw LLMError.invalidResponse("结构化 JSON 解析失败：\(error.localizedDescription)")
-                }
+                return content
             } catch let error as LLMError {
                 throw error
             } catch let error as URLError {
@@ -79,7 +110,7 @@ public struct OpenAICompatibleLLMClient: LLMClient {
         throw lastError.map { LLMError.invalidResponse($0.localizedDescription) } ?? LLMError.networkUnavailable
     }
 
-    private func messages(for request: FoodUnderstandingRequest) -> [ChatMessageRequest] {
+    private func foodMessages(for request: FoodUnderstandingRequest) -> [ChatMessageRequest] {
         let system = """
         你是健身饮食 App 的食物理解器。把文本或图片转换为一个 JSON 对象，不要输出 Markdown 或解释文字。
         只返回候选项，不计算每日汇总，不假装照片可以精确测量重量。
@@ -119,10 +150,17 @@ public struct OpenAICompatibleLLMClient: LLMClient {
 private struct ChatRequest: Encodable {
     let model: String
     let messages: [ChatMessageRequest]
-    let responseFormat: ResponseFormat
+    let responseFormat: ResponseFormat?
 
     enum CodingKeys: String, CodingKey {
         case model, messages, responseFormat = "response_format"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(model, forKey: .model)
+        try container.encode(messages, forKey: .messages)
+        try container.encodeIfPresent(responseFormat, forKey: .responseFormat)
     }
 }
 

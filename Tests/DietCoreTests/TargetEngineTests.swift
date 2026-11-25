@@ -104,8 +104,8 @@ final class TargetEngineTests {
         #expect(historical.dailyTarget.calories == 2200)
     }
 
-    @Test("Automatic target remains a proposal until accepted")
-    func automaticTargetRequiresConfirmation() throws {
+    @Test("Legacy automatic target proposal remains compatible with accept")
+    func legacyAutomaticTargetProposal() throws {
         let targetStore = InMemoryDailyTargetStore()
         let phaseStore = InMemoryPhasePlanStore()
         _ = try PhasePlanService(store: phaseStore).startNewPhase(PhasePlanInput(
@@ -124,13 +124,351 @@ final class TargetEngineTests {
         #expect(!saved.requiresConfirmation)
     }
 
-    private func profile(sex: BiologicalSex? = .male) -> UserProfile {
+    @Test("Reconciliation saves an automatic target immediately")
+    func reconciliationSavesAutomaticTodayTarget() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: 0,
+            strategy: .automatic,
+            version: 1
+        )
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        let result = try service.reconcile(on: today, profile: profile())
+
+        #expect(!result.today.usedExistingTarget)
+        #expect(!result.today.requiresConfirmation)
+        #expect(result.backfilledDates.isEmpty)
+        let saved = try #require(try targetStore.target(on: today))
+        #expect(saved === result.today.dailyTarget)
+        #expect(targetStore.allTargets.count == 1)
+    }
+
+    @Test("Reconciliation preserves manual target behavior")
+    func reconciliationSavesManualTodayTarget() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: 0,
+            strategy: .manual,
+            calories: 2100,
+            version: 1
+        )
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        let result = try service.reconcile(on: today, profile: UserProfile())
+
+        #expect(!result.today.requiresConfirmation)
+        #expect(result.today.dailyTarget.calories == 2100)
+        #expect(try targetStore.target(on: today) === result.today.dailyTarget)
+    }
+
+    @Test("Historical targets follow the phase active on each day")
+    func historicalBackfillUsesDailyPhase() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: -6,
+            endOffset: -4,
+            strategy: .manual,
+            calories: 2200,
+            version: 1
+        )
+        try savePlan(
+            to: phaseStore,
+            startOffset: -3,
+            endOffset: -2,
+            strategy: .manual,
+            calories: 1900,
+            version: 2
+        )
+        try savePlan(
+            to: phaseStore,
+            startOffset: 0,
+            strategy: .manual,
+            calories: 2100,
+            version: 3
+        )
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        let result = try service.reconcile(on: today, profile: UserProfile())
+
+        #expect(result.backfilledDates.map(dayOffset) == [-6, -5, -4, -3, -2])
+        #expect(try targetStore.target(on: day(-5))?.calories == 2200)
+        #expect(try targetStore.target(on: day(-3))?.calories == 1900)
+        #expect(try targetStore.target(on: day(-1)) == nil)
+        #expect(try targetStore.target(on: today)?.calories == 2100)
+    }
+
+    @Test("Historical automatic targets use the current profile")
+    func historicalAutomaticTargetUsesCurrentProfile() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: -2,
+            endOffset: -1,
+            strategy: .automatic,
+            adjustment: 10,
+            version: 1
+        )
+        try savePlan(
+            to: phaseStore,
+            startOffset: 0,
+            strategy: .manual,
+            calories: 2100,
+            version: 2
+        )
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        let result = try service.reconcile(on: today, profile: profile(weight: 70))
+
+        #expect(result.backfilledDates.map(dayOffset) == [-2, -1])
+        let historical = try #require(try targetStore.target(on: day(-2)))
+        #expect(abs(historical.calories - 2828.16875) < 0.0001)
+        #expect(historical.proteinGrams == 126)
+    }
+
+    @Test("Future phases do not participate in reconciliation")
+    func futurePhasesAreExcluded() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: 0,
+            strategy: .manual,
+            calories: 2100,
+            version: 1
+        )
+        try savePlan(
+            to: phaseStore,
+            startOffset: 1,
+            strategy: .manual,
+            calories: 1800,
+            version: 2
+        )
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        let result = try service.reconcile(on: today, profile: UserProfile())
+
+        #expect(result.backfilledDates.isEmpty)
+        #expect(try targetStore.target(on: day(1)) == nil)
+    }
+
+    @Test("Existing targets are never overwritten")
+    func existingTargetsAreNotOverwritten() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: -2,
+            strategy: .manual,
+            calories: 2200,
+            version: 1
+        )
+        let override = DailyTarget(
+            date: day(-2),
+            calories: 2400,
+            proteinGrams: 140,
+            carbohydrateGrams: 250,
+            fatGrams: 70,
+            phasePlanVersion: 1,
+            isSingleDayOverride: true
+        )
+        let accepted = DailyTarget(
+            date: day(-1),
+            calories: 2000,
+            proteinGrams: 140,
+            carbohydrateGrams: 180,
+            fatGrams: 65,
+            phasePlanVersion: 1
+        )
+        try targetStore.saveTarget(override)
+        try targetStore.saveTarget(accepted)
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        let result = try service.reconcile(on: today, profile: UserProfile())
+
+        #expect(result.backfilledDates.isEmpty)
+        #expect(try targetStore.target(on: day(-2)) === override)
+        #expect(override.calories == 2400)
+        #expect(override.isSingleDayOverride)
+        #expect(try targetStore.target(on: day(-1)) === accepted)
+        #expect(accepted.calories == 2000)
+        #expect(try targetStore.target(on: today)?.calories == 2200)
+    }
+
+    @Test("Reconciliation is idempotent")
+    func reconciliationIsIdempotent() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: -2,
+            strategy: .manual,
+            calories: 2200,
+            version: 1
+        )
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        let first = try service.reconcile(on: today, profile: UserProfile())
+        #expect(first.backfilledDates.map(dayOffset) == [-2, -1])
+        #expect(targetStore.allTargets.count == 3)
+        let yesterdayBefore = try #require(try targetStore.target(on: day(-1)))
+
+        let second = try service.reconcile(on: today, profile: UserProfile())
+        #expect(second.backfilledDates.isEmpty)
+        #expect(second.today.usedExistingTarget)
+        #expect(targetStore.allTargets.count == 3)
+        #expect(try targetStore.target(on: day(-1)) === yesterdayBefore)
+    }
+
+    @Test("Backfill errors preserve existing targets")
+    func backfillErrorsPreserveExistingTargets() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: -1,
+            endOffset: -1,
+            strategy: .manual,
+            calories: 2100,
+            version: 1
+        )
+        try savePlan(
+            to: phaseStore,
+            startOffset: 0,
+            strategy: .automatic,
+            version: 2
+        )
+        let existing = DailyTarget(
+            date: day(-1),
+            calories: 2100,
+            proteinGrams: 140,
+            carbohydrateGrams: 210,
+            fatGrams: 70,
+            phasePlanVersion: 1
+        )
+        try targetStore.saveTarget(existing)
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+
+        #expect(throws: TargetEngineError.missingSex) {
+            try service.reconcile(on: self.today, profile: self.profile(sex: nil))
+        }
+        #expect(try targetStore.target(on: day(-1)) === existing)
+        #expect(existing.calories == 2100)
+        #expect(targetStore.allTargets.count == 1)
+    }
+
+    @Test("Single-day update only changes today")
+    func singleDayUpdateOnlyChangesToday() throws {
+        let targetStore = InMemoryDailyTargetStore()
+        let phaseStore = InMemoryPhasePlanStore()
+        try savePlan(
+            to: phaseStore,
+            startOffset: -1,
+            strategy: .manual,
+            calories: 2200,
+            version: 3
+        )
+        let service = DailyTargetService(targetStore: targetStore, phaseStore: phaseStore)
+        _ = try service.reconcile(on: today, profile: UserProfile())
+        let original = try #require(try targetStore.target(on: today))
+        let yesterdayBefore = try #require(try targetStore.target(on: day(-1)))
+
+        let updated = try service.updateTodayTarget(
+            ManualNutritionTarget(calories: 1800, proteinGrams: 120, carbohydrateGrams: 0, fatGrams: 0),
+            profile: UserProfile(),
+            on: today
+        )
+
+        let todayAfter = try #require(try targetStore.target(on: today))
+        #expect(todayAfter === original)
+        #expect(todayAfter.calories == 1800)
+        #expect(todayAfter.proteinGrams == 120)
+        #expect(todayAfter.carbohydrateGrams == 0)
+        #expect(todayAfter.fatGrams == 0)
+        #expect(todayAfter.isSingleDayOverride)
+        #expect(todayAfter.id == original.id)
+        #expect(todayAfter.date == original.date)
+        #expect(todayAfter.phasePlanVersion == 3)
+        #expect(yesterdayBefore.calories == 2200)
+        #expect(updated.dailyTarget === todayAfter)
+
+        let unchanged = (
+            todayAfter.calories,
+            todayAfter.proteinGrams,
+            todayAfter.carbohydrateGrams,
+            todayAfter.fatGrams
+        )
+        #expect(throws: PhasePlanValidationError.negativeMacroTarget) {
+            try service.updateTodayTarget(
+                ManualNutritionTarget(calories: 1800, proteinGrams: -1, carbohydrateGrams: 0, fatGrams: 0),
+                profile: UserProfile(),
+                on: self.today
+            )
+        }
+        #expect(todayAfter.calories == unchanged.0)
+        #expect(todayAfter.proteinGrams == unchanged.1)
+        #expect(todayAfter.carbohydrateGrams == unchanged.2)
+        #expect(todayAfter.fatGrams == unchanged.3)
+
+        let reconciled = try service.reconcile(on: today, profile: UserProfile())
+        #expect(reconciled.today.usedExistingTarget)
+        #expect(reconciled.today.dailyTarget.calories == 1800)
+        #expect(reconciled.today.dailyTarget.isSingleDayOverride)
+    }
+
+    private func profile(sex: BiologicalSex? = .male, weight: Double = 70) -> UserProfile {
         UserProfile(
             ageYears: 28,
             heightCentimeters: 175,
-            currentWeightKilograms: 70,
+            currentWeightKilograms: weight,
             biologicalSex: sex,
             activityLevel: .moderate
         )
+    }
+
+    private var today: Date {
+        Calendar.current.startOfDay(for: Date())
+    }
+
+    private func day(_ offset: Int) -> Date {
+        Calendar.current.date(byAdding: .day, value: offset, to: today)!
+    }
+
+    private func dayOffset(_ date: Date) -> Int {
+        Calendar.current.dateComponents([.day], from: today, to: date).day!
+    }
+
+    private func savePlan(
+        to store: InMemoryPhasePlanStore,
+        startOffset: Int,
+        endOffset: Int? = nil,
+        strategy: EnergyStrategy,
+        calories: Double = 2200,
+        adjustment: Double = 0,
+        version: Int
+    ) throws {
+        let startDate = day(startOffset)
+        let endDate = endOffset.map(day)
+        let manualTarget = strategy == .manual
+            ? ManualNutritionTarget(calories: calories, proteinGrams: 140, carbohydrateGrams: 220, fatGrams: 70)
+            : nil
+        let plan = PhasePlan(
+            phaseType: .maintenance,
+            startDate: startDate,
+            endDate: endDate,
+            version: version,
+            energyStrategy: strategy,
+            energyAdjustmentPercent: strategy == .automatic ? adjustment : nil,
+            manualTarget: manualTarget,
+            macroRule: strategy == .automatic ? .default : nil
+        )
+        try store.saveNewPhase(plan)
     }
 }

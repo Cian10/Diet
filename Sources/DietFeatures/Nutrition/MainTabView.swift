@@ -5,6 +5,7 @@ public enum AppTab: Hashable {
     case today
     case diary
     case trends
+    case analysis
     case profile
 }
 
@@ -65,6 +66,9 @@ public struct MainTabView: View {
             destination(for: .trends)
                 .tabItem { Label("趋势", systemImage: "chart.line.uptrend.xyaxis") }
                 .tag(AppTab.trends)
+            destination(for: .analysis)
+                .tabItem { Label("AI 分析", systemImage: "sparkles") }
+                .tag(AppTab.analysis)
             destination(for: .profile)
                 .tabItem { Label("我的", systemImage: "person") }
                 .tag(AppTab.profile)
@@ -103,6 +107,12 @@ public struct MainTabView: View {
                 phaseStore: phaseStore,
                 proposalStore: proposalStore,
                 onReviewChanged: { profileViewModel.reload() }
+            )
+        case .analysis:
+            DietAnalysisView(
+                mealStore: mealStore,
+                targetStore: targetStore,
+                llmProvider: llmProvider
             )
         case .profile:
             SettingsHubView(

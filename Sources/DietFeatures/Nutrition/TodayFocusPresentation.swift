@@ -4,7 +4,6 @@ import Foundation
 /// It never decides whether a target or meal can be saved.
 struct TodayFocusPresentation: Equatable {
     enum Kind: Equatable {
-        case confirmTarget
         case reviewMeal
         case startLogging
         case recordDinner
@@ -16,14 +15,11 @@ struct TodayFocusPresentation: Equatable {
 
     init(
         hasTarget: Bool,
-        targetRequiresConfirmation: Bool,
         hasPendingOrFailedMeal: Bool,
         hasDinner: Bool,
         isGoalMet: Bool
     ) {
-        if hasTarget && targetRequiresConfirmation {
-            kind = .confirmTarget
-        } else if hasPendingOrFailedMeal {
+        if hasPendingOrFailedMeal {
             kind = .reviewMeal
         } else if !hasTarget {
             kind = .startLogging
@@ -38,7 +34,6 @@ struct TodayFocusPresentation: Equatable {
 
     var title: String {
         switch kind {
-        case .confirmTarget: "确认今日目标"
         case .reviewMeal: "完成这一餐的确认"
         case .startLogging: "记录今天的第一餐"
         case .recordDinner: "记录晚餐"
@@ -49,8 +44,6 @@ struct TodayFocusPresentation: Equatable {
 
     var message: String {
         switch kind {
-        case .confirmTarget:
-            "今日目标尚未生效。核对热量与宏量营养后，再开始记录会更准确。"
         case .reviewMeal:
             "有一餐仍待确认或分析未完成。继续核对内容，已填写的信息会保留。"
         case .startLogging:
@@ -66,7 +59,6 @@ struct TodayFocusPresentation: Equatable {
 
     var actionTitle: String {
         switch kind {
-        case .confirmTarget: "核对并确认目标"
         case .reviewMeal: "继续确认"
         case .startLogging, .recordDinner: "记一餐"
         case .completed, .maintain: "查看今日记录"
@@ -74,6 +66,6 @@ struct TodayFocusPresentation: Equatable {
     }
 
     var needsAttention: Bool {
-        kind == .confirmTarget || kind == .reviewMeal
+        kind == .reviewMeal
     }
 }

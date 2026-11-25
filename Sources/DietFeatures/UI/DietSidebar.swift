@@ -114,13 +114,14 @@ private struct DietSidebarHeader: View {
 #endif
 
 extension AppTab {
-    static var sidebarItems: [AppTab] { [.today, .diary, .trends, .profile] }
+    static var sidebarItems: [AppTab] { [.today, .diary, .trends, .analysis, .profile] }
 
     var title: String {
         switch self {
         case .today: "今天"
         case .diary: "日记"
         case .trends: "趋势"
+        case .analysis: "AI 分析"
         case .profile: "我的"
         }
     }
@@ -130,6 +131,7 @@ extension AppTab {
         case .today: "sun.max"
         case .diary: "book.closed"
         case .trends: "chart.line.uptrend.xyaxis"
+        case .analysis: "sparkles"
         case .profile: "person"
         }
     }

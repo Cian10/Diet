@@ -35,6 +35,76 @@ final class LLMClientTests {
         #expect((object["response_format"] as? [String: String])?["type"] == "json_object")
     }
 
+    @Test("Plain text request omits response_format and returns trimmed text")
+    func plainTextGeneration() async throws {
+        var capturedRequest: URLRequest?
+        var capturedBody: Data?
+        let session = stubSession { request in
+            capturedRequest = request
+            capturedBody = Self.body(from: request)
+            return Self.response(status: 200, content: "  \n这是一段普通饮食分析。\n  ")
+        }
+        let client = OpenAICompatibleLLMClient(
+            configuration: LLMConfiguration(baseURLString: "https://example.com/v1", model: "analysis-model"),
+            apiKey: "secret",
+            session: session
+        )
+        let result = try await client.generateText(TextGenerationRequest(
+            systemPrompt: "只输出中文分析。",
+            userPrompt: "分析今天的记录。"
+        ))
+
+        #expect(result == "这是一段普通饮食分析。")
+        _ = try #require(capturedRequest)
+        let body = try #require(capturedBody)
+        let object = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(object["response_format"] == nil)
+        #expect(object["model"] as? String == "analysis-model")
+        let messages = try #require(object["messages"] as? [[String: Any]])
+        #expect(messages.count == 2)
+    }
+
+    @Test("Plain text request rejects blank model output")
+    func plainTextEmptyResponse() async {
+        let session = stubSession { _ in
+            Self.response(status: 200, content: "  \n\n ")
+        }
+        let client = OpenAICompatibleLLMClient(
+            configuration: LLMConfiguration(baseURLString: "https://example.com/v1", model: "analysis-model"),
+            apiKey: "secret",
+            session: session
+        )
+        await #expect(throws: LLMError.invalidResponse("模型返回了空文本。")) {
+            _ = try await client.generateText(TextGenerationRequest(
+                systemPrompt: "输出分析。",
+                userPrompt: "分析记录。"
+            ))
+        }
+    }
+
+    @Test("Plain text request surfaces HTTP errors")
+    func plainTextHTTPError() async {
+        let session = stubSession { _ in
+            (HTTPURLResponse(
+                url: URL(string: "https://example.com")!,
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: nil
+            )!, Data("server unavailable".utf8))
+        }
+        let client = OpenAICompatibleLLMClient(
+            configuration: LLMConfiguration(baseURLString: "https://example.com/v1", model: "analysis-model"),
+            apiKey: "secret",
+            session: session
+        )
+        await #expect(throws: LLMError.httpError(500, "server unavailable")) {
+            _ = try await client.generateText(TextGenerationRequest(
+                systemPrompt: "输出分析。",
+                userPrompt: "分析记录。"
+            ))
+        }
+    }
+
     @Test("Image request embeds JPEG data URL")
     func imageRequest() async throws {
         var capturedBody: Data?

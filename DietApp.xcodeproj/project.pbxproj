@@ -33,6 +33,7 @@
 		5ABF3C57A6F74C2DAF0A0475 /* PhotoLoggingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBE80390EB8866041C408AEC /* PhotoLoggingView.swift */; };
 		5DFC59AECAE4261D004E4730 /* DiaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E85EB083B4A58FABC483CB11 /* DiaryView.swift */; };
 		60B0962849D7E25D050609D4 /* AppNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D00AFF5D1985182884D214 /* AppNotificationService.swift */; };
+		6D674BF478FC4E4AEA8BE7D5 /* TodayTargetEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8510D99E6DF6A5B9020D4CD0 /* TodayTargetEditView.swift */; };
 		75930A29576A208689A99172 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26229C9C6AE2BF27FCDB0972 /* UserProfile.swift */; };
 		7772C1E1999ECB6429735F2B /* LLMSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD7C9B67B621A1B4446EBB3 /* LLMSettingsView.swift */; };
 		85FD92D3B315994C762FC97A /* LLMConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68E1154E1A9B27391A101A08 /* LLMConfiguration.swift */; };
@@ -45,6 +46,7 @@
 		9CA9E657D88591F348FD83EB /* TodayFocusPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1F5A4BF4F78F699355E1FB /* TodayFocusPresentation.swift */; };
 		9CD68A3E458ADE040C6475C2 /* WeeklyReviewSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930EC1BD7909CB8DE7A91FE6 /* WeeklyReviewSectionView.swift */; };
 		A7872DDF109C02DEEACE2152 /* ProfileFormFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97857698FCA8E6261EE5BCF2 /* ProfileFormFields.swift */; };
+		A7F8E15CB1AFCBD0844E388C /* DietAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52ED6321178FA705CF08DDC7 /* DietAnalysisView.swift */; };
 		A8B0D9033E3CE33AE9CE50F8 /* DietPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E6F7DECD68E661FF4B4FA9 /* DietPersistence.swift */; };
 		A98D667A3CD6EECFB5B1C314 /* ProfileFormState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96ADCDBA00506AA2069FEE12 /* ProfileFormState.swift */; };
 		AA1D5A5021DC07C608D30761 /* PhasePlanFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B3A2D536FB899A03B57386 /* PhasePlanFormView.swift */; };
@@ -55,6 +57,7 @@
 		CDAC1671EEC9DFDFB191C6E9 /* DietCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A2FE0424248790498A7E7A /* DietCore.framework */; };
 		D333E0B54D3B89B6D18B1289 /* NutritionHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8DCA6F3778E008F639B5DA /* NutritionHomeView.swift */; };
 		D45F3A4F877A26858EE58FDF /* RecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4151220F4B30CD9BB262D2B5 /* RecommendationEngine.swift */; };
+		D4B391736AF67CFB6783BA70 /* DietAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D9B3E633F98B5351457285 /* DietAnalysisService.swift */; };
 		DC5FE374993D65722BB09441 /* DietLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D39408AEF5D986CC31220CC /* DietLayout.swift */; };
 		DCAE9F80F3276B307B64B2D4 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF348DA7B5BB67B086A3DAF /* OnboardingView.swift */; };
 		DDDCBD42E57F05F0492D2583 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB68035558AC693010F0E39 /* ProfileService.swift */; };
@@ -120,6 +123,8 @@
 		4D39408AEF5D986CC31220CC /* DietLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietLayout.swift; sourceTree = "<group>"; };
 		4E934C0FB5A43B10F1A5D2D3 /* DietApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DietApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F375E8096E738318925A882 /* RecommendationSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationSectionView.swift; sourceTree = "<group>"; };
+		51D9B3E633F98B5351457285 /* DietAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietAnalysisService.swift; sourceTree = "<group>"; };
+		52ED6321178FA705CF08DDC7 /* DietAnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietAnalysisView.swift; sourceTree = "<group>"; };
 		53B131CE293DDF802B824AAC /* PhasePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhasePlan.swift; sourceTree = "<group>"; };
 		59F848F0068F1CBA3A8F5651 /* ProfileRootViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileRootViewModel.swift; sourceTree = "<group>"; };
 		5A8DCA6F3778E008F639B5DA /* NutritionHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionHomeView.swift; sourceTree = "<group>"; };
@@ -129,6 +134,7 @@
 		740F92C918864F6A05C8A312 /* DailyTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyTarget.swift; sourceTree = "<group>"; };
 		7BB68035558AC693010F0E39 /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
 		846A2F8B806D6F724DA37C99 /* DietSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietSidebar.swift; sourceTree = "<group>"; };
+		8510D99E6DF6A5B9020D4CD0 /* TodayTargetEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTargetEditView.swift; sourceTree = "<group>"; };
 		85F468E4FC3CAB094366D6BA /* TrendsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsService.swift; sourceTree = "<group>"; };
 		90586FC98EDCE43D439EAE5E /* MealConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealConfirmationView.swift; sourceTree = "<group>"; };
 		930EC1BD7909CB8DE7A91FE6 /* WeeklyReviewSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewSectionView.swift; sourceTree = "<group>"; };
@@ -207,6 +213,7 @@
 				37BE1441DDAF66C503FCD96F /* MainTabView.swift */,
 				5A8DCA6F3778E008F639B5DA /* NutritionHomeView.swift */,
 				2B1F5A4BF4F78F699355E1FB /* TodayFocusPresentation.swift */,
+				8510D99E6DF6A5B9020D4CD0 /* TodayTargetEditView.swift */,
 			);
 			path = Nutrition;
 			sourceTree = "<group>";
@@ -240,6 +247,7 @@
 		496084D7A5AED68AB9E96E8A /* DietFeatures */ = {
 			isa = PBXGroup;
 			children = (
+				E9F164E017EC703F08084742 /* Analysis */,
 				88A36D01575E25709A3E3883 /* Diary */,
 				F8201B53484DC544BB61AA6D /* Logging */,
 				0CF18247CECD663690E3F429 /* Nutrition */,
@@ -291,6 +299,14 @@
 				E85EB083B4A58FABC483CB11 /* DiaryView.swift */,
 			);
 			path = Diary;
+			sourceTree = "<group>";
+		};
+		9A7384173929FF79823FBB7F /* Analysis */ = {
+			isa = PBXGroup;
+			children = (
+				51D9B3E633F98B5351457285 /* DietAnalysisService.swift */,
+			);
+			path = Analysis;
 			sourceTree = "<group>";
 		};
 		ABEE1D59BD9E4EB103919D01 /* Trends */ = {
@@ -380,6 +396,14 @@
 			path = Settings;
 			sourceTree = "<group>";
 		};
+		E9F164E017EC703F08084742 /* Analysis */ = {
+			isa = PBXGroup;
+			children = (
+				52ED6321178FA705CF08DDC7 /* DietAnalysisView.swift */,
+			);
+			path = Analysis;
+			sourceTree = "<group>";
+		};
 		EA1819DF73E5DF7EC2D2B776 /* Notifications */ = {
 			isa = PBXGroup;
 			children = (
@@ -419,6 +443,7 @@
 		F88EB780B848D881FEE5F2E8 /* DietCore */ = {
 			isa = PBXGroup;
 			children = (
+				9A7384173929FF79823FBB7F /* Analysis */,
 				0449AA40FF488062AF0B95F1 /* LLM */,
 				C6A773322D98CFCF93B01F91 /* Logging */,
 				DF1A32ACEA1D3ECFB7CEB132 /* Media */,
@@ -550,6 +575,7 @@
 				60B0962849D7E25D050609D4 /* AppNotificationService.swift in Sources */,
 				9B2978BAAAB7392D38EB3A3F /* DailyTarget.swift in Sources */,
 				49BE03FD64640760A4AE12A1 /* DiaryModels.swift in Sources */,
+				D4B391736AF67CFB6783BA70 /* DietAnalysisService.swift in Sources */,
 				A8B0D9033E3CE33AE9CE50F8 /* DietPersistence.swift in Sources */,
 				2D7E11D66514D98A09396E41 /* DomainEnums.swift in Sources */,
 				97951DBC05CE33897B6B22FB /* FoodLoggingService.swift in Sources */,
@@ -586,6 +612,7 @@
 				0852513E05FE119C783E0230 /* AppRootView.swift in Sources */,
 				27EF1DB52275C3AAF37A0BAA /* DesktopImageImporter.swift in Sources */,
 				5DFC59AECAE4261D004E4730 /* DiaryView.swift in Sources */,
+				A7F8E15CB1AFCBD0844E388C /* DietAnalysisView.swift in Sources */,
 				430CDA9D099929C194DCF70A /* DietButtons.swift in Sources */,
 				5441CE153B0FDDB1216F833E /* DietComponents.swift in Sources */,
 				DC5FE374993D65722BB09441 /* DietLayout.swift in Sources */,
@@ -608,6 +635,7 @@
 				C8D765B8425EBAB3C80322E4 /* RecommendationSectionView.swift in Sources */,
 				0498B9CAC29A46FFD80CBB85 /* TextLoggingView.swift in Sources */,
 				9CA9E657D88591F348FD83EB /* TodayFocusPresentation.swift in Sources */,
+				6D674BF478FC4E4AEA8BE7D5 /* TodayTargetEditView.swift in Sources */,
 				555F5E12A1FB4F7A597DC7D3 /* TrendsView.swift in Sources */,
 				9CD68A3E458ADE040C6475C2 /* WeeklyReviewSectionView.swift in Sources */,
 			);

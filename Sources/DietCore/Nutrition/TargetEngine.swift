@@ -46,6 +46,16 @@ public struct TargetResolution {
     public var requiresConfirmation: Bool
 }
 
+public struct DailyTargetReconciliation {
+    public var today: TargetResolution
+    public var backfilledDates: [Date]
+
+    public init(today: TargetResolution, backfilledDates: [Date]) {
+        self.today = today
+        self.backfilledDates = backfilledDates
+    }
+}
+
 public struct TargetEngine: Sendable {
     public var energyFactors: MacroEnergyFactors
 
@@ -187,6 +197,8 @@ public final class InMemoryDailyTargetStore: DailyTargetStoring {
 
     public init() {}
 
+    public var allTargets: [DailyTarget] { targets }
+
     public func target(on date: Date) throws -> DailyTarget? {
         let day = Calendar.current.startOfDay(for: date)
         return targets.first { Calendar.current.isDate($0.date, inSameDayAs: day) }
@@ -248,7 +260,135 @@ public final class DailyTargetService {
         return resolution
     }
 
+    public func reconcile(
+        on date: Date = Date(),
+        profile: UserProfile,
+        additionalTrainingCalories: Double? = nil
+    ) throws -> DailyTargetReconciliation {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: date)
+        let plans = try phaseStore.allPlans()
+        let backfilledDates = try backfillMissingTargets(
+            through: today,
+            plans: plans,
+            profile: profile,
+            additionalTrainingCalories: additionalTrainingCalories
+        )
+
+        if let existing = try targetStore.target(on: today) {
+            return DailyTargetReconciliation(
+                today: existingResolution(
+                    existing,
+                    profile: profile,
+                    additionalTrainingCalories: additionalTrainingCalories
+                ),
+                backfilledDates: backfilledDates
+            )
+        }
+
+        guard let phase = plans.first(where: { $0.contains(today) }) else {
+            throw TargetEngineError.noActivePhase
+        }
+        var resolution = try engine.resolve(
+            profile: profile,
+            phase: phase,
+            date: today,
+            additionalTrainingCalories: additionalTrainingCalories
+        )
+        resolution.requiresConfirmation = false
+        try targetStore.saveTarget(resolution.dailyTarget)
+        return DailyTargetReconciliation(today: resolution, backfilledDates: backfilledDates)
+    }
+
+    @discardableResult
+    public func updateTodayTarget(
+        _ manualTarget: ManualNutritionTarget,
+        profile: UserProfile,
+        on date: Date = Date(),
+        additionalTrainingCalories: Double? = nil
+    ) throws -> TargetResolution {
+        let validated = try manualTarget.validated()
+        _ = try reconcile(
+            on: date,
+            profile: profile,
+            additionalTrainingCalories: additionalTrainingCalories
+        )
+        guard let target = try targetStore.target(on: date) else {
+            throw TargetEngineError.noActivePhase
+        }
+
+        target.calories = validated.calories
+        target.proteinGrams = validated.proteinGrams
+        target.carbohydrateGrams = validated.carbohydrateGrams
+        target.fatGrams = validated.fatGrams
+        target.isSingleDayOverride = true
+        try targetStore.saveTarget(target)
+        return existingResolution(
+            target,
+            profile: profile,
+            additionalTrainingCalories: additionalTrainingCalories
+        )
+    }
+
     public func accept(_ resolution: TargetResolution) throws {
         try targetStore.saveTarget(resolution.dailyTarget)
+    }
+
+    private func backfillMissingTargets(
+        through today: Date,
+        plans: [PhasePlan],
+        profile: UserProfile,
+        additionalTrainingCalories: Double?
+    ) throws -> [Date] {
+        let calendar = Calendar.current
+        let eligibleStarts = plans
+            .map(\.startDate)
+            .map(calendar.startOfDay(for:))
+            .filter { $0 <= today }
+        guard let earliestStart = eligibleStarts.min(),
+              let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else {
+            return []
+        }
+
+        var backfilledDates: [Date] = []
+        var day = earliestStart
+        while day <= yesterday {
+            if try targetStore.target(on: day) == nil,
+               let phase = plans.first(where: { $0.contains(day) }) {
+                let resolution = try engine.resolve(
+                    profile: profile,
+                    phase: phase,
+                    date: day,
+                    additionalTrainingCalories: additionalTrainingCalories
+                )
+                try targetStore.saveTarget(resolution.dailyTarget)
+                backfilledDates.append(day)
+            }
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else {
+                break
+            }
+            day = nextDay
+        }
+        return backfilledDates
+    }
+
+    private func existingResolution(
+        _ target: DailyTarget,
+        profile: UserProfile,
+        additionalTrainingCalories: Double?
+    ) -> TargetResolution {
+        let expenditure = try? engine.expenditureEstimate(
+            profile: profile,
+            additionalTrainingCalories: additionalTrainingCalories
+        )
+        return TargetResolution(
+            dailyTarget: target,
+            basalMetabolicRate: expenditure?.bmr,
+            estimatedMaintenanceCalories: expenditure?.maintenance,
+            assumptions: ["使用当天已保存的目标，不因后续档案或阶段变化而重写。"],
+            warnings: [],
+            usedExistingTarget: true,
+            requiresConfirmation: false
+        )
     }
 }

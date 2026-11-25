@@ -179,8 +179,25 @@ public struct FoodUnderstandingRequest: Sendable {
     }
 }
 
+public struct TextGenerationRequest: Sendable, Equatable {
+    public var systemPrompt: String
+    public var userPrompt: String
+
+    public init(systemPrompt: String, userPrompt: String) {
+        self.systemPrompt = systemPrompt
+        self.userPrompt = userPrompt
+    }
+}
+
 public protocol LLMClient {
     func analyzeFood(_ request: FoodUnderstandingRequest) async throws -> FoodUnderstandingResult
+    func generateText(_ request: TextGenerationRequest) async throws -> String
+}
+
+public extension LLMClient {
+    func generateText(_ request: TextGenerationRequest) async throws -> String {
+        throw LLMError.invalidResponse("当前 LLM 客户端不支持纯文本生成。")
+    }
 }
 
 @MainActor

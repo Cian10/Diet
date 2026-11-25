@@ -1,6 +1,16 @@
 import SwiftUI
 import DietCore
 
+public enum NutritionHomeTargetUpdateError: LocalizedError, Equatable {
+    case missingProfile
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingProfile: "尚未创建个人档案，暂时无法保存今日目标。"
+        }
+    }
+}
+
 @MainActor
 public final class NutritionHomeViewModel: ObservableObject {
     @Published public private(set) var target: TargetResolution?
@@ -41,15 +51,11 @@ public final class NutritionHomeViewModel: ObservableObject {
                 intake = NutritionTotals()
                 weeklyTargetDays = nil
                 weeklyEligibleDays = 0
+                errorMessage = nil
                 return
             }
-            target = try targetService.target(on: Date(), profile: profile)
-            entries = try mealStore.allEntries()
-            intake = calculator.dailyNutrition(entries: entries, on: Date())
-            let days = try trendsService.dailyTrends()
-            let eligible = days.filter(\.isEligibleForTargetCompletion)
-            weeklyEligibleDays = eligible.count
-            weeklyTargetDays = eligible.isEmpty ? nil : eligible.filter(\.meetsCalorieTarget).count
+            target = try targetService.reconcile(on: Date(), profile: profile).today
+            try refreshHomeData()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -63,7 +69,7 @@ public final class NutritionHomeViewModel: ObservableObject {
     }
 
     public var assessment: NutritionAssessment? {
-        guard let target, !target.requiresConfirmation else { return nil }
+        guard let target else { return nil }
         return calculator.assess(
             intake: intake,
             target: target.dailyTarget,
@@ -71,10 +77,18 @@ public final class NutritionHomeViewModel: ObservableObject {
         )
     }
 
-    public func acceptTarget() throws {
-        guard let target else { return }
-        try targetService.accept(target)
-        load()
+    public func updateTodayTarget(_ manualTarget: ManualNutritionTarget) throws {
+        do {
+            guard let profile = try profileStore.fetchProfile() else {
+                throw NutritionHomeTargetUpdateError.missingProfile
+            }
+            target = try targetService.updateTodayTarget(manualTarget, profile: profile)
+            try refreshHomeData()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            throw error
+        }
     }
 
     @discardableResult
@@ -90,6 +104,15 @@ public final class NutritionHomeViewModel: ObservableObject {
             return false
         }
     }
+
+    private func refreshHomeData() throws {
+        entries = try mealStore.allEntries()
+        intake = calculator.dailyNutrition(entries: entries, on: Date())
+        let days = try trendsService.dailyTrends()
+        let eligible = days.filter(\.isEligibleForTargetCompletion)
+        weeklyEligibleDays = eligible.count
+        weeklyTargetDays = eligible.isEmpty ? nil : eligible.filter(\.meetsCalorieTarget).count
+    }
 }
 
 public struct NutritionHomeView: View {
@@ -97,6 +120,7 @@ public struct NutritionHomeView: View {
     @StateObject private var recommendationViewModel: RecommendationViewModel
     @State private var loggingRoute: DietLoggingRoute?
     @State private var focusedEntry: MealEntry?
+    @State private var isEditingTarget = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let mealStore: MealEntryStoring
@@ -131,7 +155,7 @@ public struct NutritionHomeView: View {
     private var focus: TodayFocusPresentation {
         let todayEntries = viewModel.todayEntries
         let goalMet: Bool
-        if let target = viewModel.target, !target.requiresConfirmation {
+        if let target = viewModel.target {
             let tolerance = max(target.dailyTarget.calories * 0.1, 1)
             goalMet = abs(target.dailyTarget.calories - viewModel.intake.calories) <= tolerance
                 && viewModel.intake.isComplete
@@ -141,7 +165,6 @@ public struct NutritionHomeView: View {
         }
         return TodayFocusPresentation(
             hasTarget: viewModel.target != nil,
-            targetRequiresConfirmation: viewModel.target?.requiresConfirmation == true,
             hasPendingOrFailedMeal: todayEntries.contains { $0.status == .draft || $0.status == .failed },
             hasDinner: todayEntries.contains { $0.mealType == .dinner },
             isGoalMet: goalMet
@@ -150,7 +173,6 @@ public struct NutritionHomeView: View {
 
     private var calorieProgress: Double? {
         guard let target = viewModel.target,
-              !target.requiresConfirmation,
               target.dailyTarget.calories > 0 else { return nil }
         return viewModel.intake.calories / target.dailyTarget.calories
     }
@@ -184,8 +206,8 @@ public struct NutritionHomeView: View {
                         performFocusAction(proxy: proxy)
                     }
 
-                    if let target = viewModel.target, target.requiresConfirmation {
-                        targetConfirmation(target)
+                    if let target = viewModel.target {
+                        todayTargetCard(target)
                     }
 
                     LazyVGrid(
@@ -314,47 +336,51 @@ public struct NutritionHomeView: View {
                 }
                 .frame(minWidth: 620, idealWidth: 680, minHeight: 640, idealHeight: 700)
             }
+            .sheet(isPresented: $isEditingTarget) {
+                if let target = viewModel.target {
+                    TodayTargetEditView(initialTarget: target.dailyTarget) { manualTarget in
+                        try viewModel.updateTodayTarget(manualTarget)
+                    }
+                }
+            }
         }
     }
 
     @ViewBuilder
-    private func targetConfirmation(_ target: TargetResolution) -> some View {
+    private func todayTargetCard(_ target: TargetResolution) -> some View {
         DietCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    DietSectionHeader(title: "待确认的今日目标")
-                    DietStatusBadge(status: .pending)
+                    DietSectionHeader(title: "今日目标")
+                    DietStatusBadge(
+                        status: .confirmed,
+                        title: target.dailyTarget.isSingleDayOverride ? "单日修改" : "已生效"
+                    )
+                    Button("修改") { isEditingTarget = true }
+                        .buttonStyle(.dietText)
                 }
                 DietKeyValueRow(title: "目标热量", value: DietFormat.calories(target.dailyTarget.calories))
-                DietKeyValueRow(
-                    title: "蛋白质／碳水／脂肪",
-                    value: "\(DietFormat.number(target.dailyTarget.proteinGrams))／\(DietFormat.number(target.dailyTarget.carbohydrateGrams))／\(DietFormat.number(target.dailyTarget.fatGrams)) g"
-                )
+                DietKeyValueRow(title: "蛋白质", value: DietFormat.grams(target.dailyTarget.proteinGrams))
+                DietKeyValueRow(title: "碳水化合物", value: DietFormat.grams(target.dailyTarget.carbohydrateGrams))
+                DietKeyValueRow(title: "脂肪", value: DietFormat.grams(target.dailyTarget.fatGrams))
                 if let bmr = target.basalMetabolicRate {
                     DietKeyValueRow(title: "估算基础代谢", value: DietFormat.calories(bmr))
                 }
                 ForEach(target.warnings, id: \.self) { warning in
                     DietInlineNotice(.warning, message: warning.displayName)
                 }
-                if !target.assumptions.isEmpty {
-                    Text(target.assumptions.joined(separator: "；"))
-                        .font(.footnote)
-                        .foregroundStyle(DietTheme.Palette.inkSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(target.dailyTarget.isSingleDayOverride
+                    ? "单日修改只影响今天，不改变阶段方案。"
+                    : "目标已按当前阶段方案生成并保存；修改只影响今天。")
+                    .font(.footnote)
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
     private func performFocusAction(proxy: ScrollViewProxy) {
         switch focus.kind {
-        case .confirmTarget:
-            do {
-                try viewModel.acceptTarget()
-                reload()
-            } catch {
-                viewModel.errorMessage = error.localizedDescription
-            }
         case .reviewMeal:
             focusedEntry = viewModel.todayEntries.first { $0.status == .draft || $0.status == .failed }
         case .startLogging, .recordDinner:

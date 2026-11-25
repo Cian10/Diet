@@ -3,23 +3,22 @@ import Testing
 
 @Suite("Today focus presentation")
 struct TodayFocusPresentationTests {
-    @Test("Target confirmation has highest priority")
-    func targetFirst() {
+    @Test("Pending meal has highest priority")
+    func pendingMealFirst() {
         let presentation = TodayFocusPresentation(
             hasTarget: true,
-            targetRequiresConfirmation: true,
             hasPendingOrFailedMeal: true,
             hasDinner: false,
             isGoalMet: true
         )
-        #expect(presentation.kind == .confirmTarget)
+        #expect(presentation.kind == .reviewMeal)
+        #expect(presentation.needsAttention)
     }
 
     @Test("Pending or failed meal comes before dinner guidance", arguments: [true, false])
     func pendingBeforeDinner(hasDinner: Bool) {
         let presentation = TodayFocusPresentation(
             hasTarget: true,
-            targetRequiresConfirmation: false,
             hasPendingOrFailedMeal: true,
             hasDinner: hasDinner,
             isGoalMet: false
@@ -31,7 +30,6 @@ struct TodayFocusPresentationTests {
     func dinner() {
         let presentation = TodayFocusPresentation(
             hasTarget: true,
-            targetRequiresConfirmation: false,
             hasPendingOrFailedMeal: false,
             hasDinner: false,
             isGoalMet: false
@@ -43,7 +41,6 @@ struct TodayFocusPresentationTests {
     func completed() {
         let presentation = TodayFocusPresentation(
             hasTarget: true,
-            targetRequiresConfirmation: false,
             hasPendingOrFailedMeal: false,
             hasDinner: true,
             isGoalMet: true
@@ -55,7 +52,6 @@ struct TodayFocusPresentationTests {
     func noTarget() {
         let presentation = TodayFocusPresentation(
             hasTarget: false,
-            targetRequiresConfirmation: false,
             hasPendingOrFailedMeal: false,
             hasDinner: true,
             isGoalMet: true
