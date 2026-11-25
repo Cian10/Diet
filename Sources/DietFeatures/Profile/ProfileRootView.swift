@@ -19,12 +19,13 @@ public struct ProfileRootView: View {
 
     public var body: some View {
         Group {
-            if let errorMessage = viewModel.errorMessage {
-                ContentUnavailableView(
-                    "无法读取个人数据",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(errorMessage)
-                )
+            if viewModel.profile == nil, let errorMessage = viewModel.errorMessage {
+                DietPage {
+                    DietPageHeader(title: "档案与健身阶段", subtitle: "个人数据读取失败时，不会显示虚假的首次设置状态。")
+                    DietInlineNotice(.error, title: "无法读取个人数据", message: errorMessage)
+                    Button("重新读取") { viewModel.reload() }
+                        .buttonStyle(.dietSecondary)
+                }
             } else if let profile = viewModel.profile {
                 profileContent(profile)
             } else {
@@ -35,72 +36,115 @@ public struct ProfileRootView: View {
     }
 
     private func profileContent(_ profile: UserProfile) -> some View {
-        NavigationStack {
-            List {
-                Section("当前方案") {
+        DietPage {
+            DietPageHeader(title: "档案与健身阶段", subtitle: "当前方案与历史目标分别保存，不追溯改写。") {
+                Button("编辑档案") { isEditingProfile = true }
+                    .buttonStyle(.dietSecondary)
+            }
+
+            if let errorMessage = viewModel.errorMessage {
+                DietInlineNotice(.error, title: "无法读取个人数据", message: errorMessage)
+            }
+
+            DietCard {
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack {
+                        DietSectionHeader(title: "当前方案")
+                        Button("创建或切换阶段") { isAddingPhase = true }
+                            .buttonStyle(.dietText)
+                    }
                     if let current = viewModel.plans.first(where: { $0.contains(Date()) }) {
-                        LabeledContent("健身阶段", value: current.phaseType.displayName)
-                        LabeledContent("方案版本", value: "v\(current.version)")
-                        LabeledContent("开始日期", value: current.startDate.formatted(date: .abbreviated, time: .omitted))
+                        DietKeyValueRow(title: "健身阶段", value: current.phaseType.displayName)
+                        DietKeyValueRow(title: "方案版本", value: "v\(current.version)")
+                        DietKeyValueRow(title: "开始日期", value: current.startDate.formatted(date: .abbreviated, time: .omitted))
                         targetSummary(current)
                     } else {
-                        Text("当前日期没有生效中的阶段方案。")
-                            .foregroundStyle(.secondary)
+                        DietInlineNotice(.warning, message: "当前日期没有生效中的阶段方案，请创建或切换阶段。")
                     }
-                    Button("创建或切换阶段") { isAddingPhase = true }
                 }
+            }
 
-                Section("个人档案") {
-                    LabeledContent("年龄", value: profile.ageYears.map { "\($0) 岁" } ?? "未填写")
-                    LabeledContent("身高", value: profile.heightCentimeters.map { "\($0.formatted()) cm" } ?? "未填写")
-                    LabeledContent("体重", value: profile.currentWeightKilograms.map { "\($0.formatted()) kg" } ?? "未填写")
-                    LabeledContent("活动水平", value: profile.activityLevel.displayName)
-                    LabeledContent("每周训练", value: "\(profile.trainingSessionsPerWeek) 次")
-                    LabeledContent("饮食偏好", value: profile.dietaryPreferences.joined(separator: "、"))
-                    LabeledContent("忌口", value: profile.avoidedFoods.joined(separator: "、"))
-                    LabeledContent("过敏", value: profile.allergies.joined(separator: "、"))
-                    Button("编辑档案") { isEditingProfile = true }
+            DietCard {
+                VStack(alignment: .leading, spacing: 13) {
+                    DietSectionHeader(title: "个人档案")
+                    DietKeyValueRow(title: "年龄", value: profile.ageYears.map { "\($0) 岁" } ?? "未填写")
+                    DietKeyValueRow(title: "身高", value: profile.heightCentimeters.map { "\(DietFormat.number($0)) cm" } ?? "未填写")
+                    DietKeyValueRow(title: "体重", value: profile.currentWeightKilograms.map { "\(DietFormat.number($0)) kg" } ?? "未填写")
+                    DietKeyValueRow(title: "活动水平", value: profile.activityLevel.displayName)
+                    DietKeyValueRow(title: "每周训练", value: "\(profile.trainingSessionsPerWeek) 次")
+                    Divider().overlay(DietTheme.Palette.border)
+                    DietKeyValueRow(title: "饮食偏好", value: listValue(profile.dietaryPreferences))
+                    DietKeyValueRow(title: "忌口", value: listValue(profile.avoidedFoods))
+                    DietKeyValueRow(title: "过敏", value: listValue(profile.allergies))
                 }
+            }
 
-                Section("阶段历史") {
+            DietCard(padding: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    DietSectionHeader(title: "阶段历史", subtitle: "\(viewModel.plans.count) 个版本")
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 6)
                     if viewModel.plans.isEmpty {
                         Text("尚无阶段方案。")
+                            .font(.footnote)
+                            .foregroundStyle(DietTheme.Palette.inkSecondary)
+                            .padding(6)
                     } else {
                         ForEach(viewModel.plans, id: \.id) { plan in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(plan.phaseType.displayName) · v\(plan.version)")
-                                    .font(.headline)
-                                Text("\(plan.status(on: Date()).displayName) · \(dateRange(plan))")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(plan.phaseType.displayName) · v\(plan.version)")
+                                        .font(.headline)
+                                        .foregroundStyle(DietTheme.Palette.ink)
+                                    Text(dateRange(plan))
+                                        .font(.footnote)
+                                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                                }
+                                Spacer()
+                                DietStatusBadge(
+                                    status: plan.status(on: Date()) == .active ? .confirmed : .neutral,
+                                    title: plan.status(on: Date()).displayName
+                                )
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 8)
+                            if plan.id != viewModel.plans.last?.id {
+                                Divider().overlay(DietTheme.Palette.border)
                             }
                         }
                     }
                 }
             }
-            .navigationTitle("我的饮食目标")
-            .sheet(isPresented: $isEditingProfile) {
-                ProfileEditView(profile: profile, viewModel: viewModel)
-            }
-            .sheet(isPresented: $isAddingPhase) {
-                PhasePlanFormView(viewModel: viewModel, startDate: viewModel.suggestedPhaseStartDate())
-            }
+        }
+        .navigationTitle("我的饮食目标")
+        .sheet(isPresented: $isEditingProfile) {
+            ProfileEditView(profile: profile, viewModel: viewModel)
+        }
+        .sheet(isPresented: $isAddingPhase) {
+            PhasePlanFormView(viewModel: viewModel, startDate: viewModel.suggestedPhaseStartDate())
         }
     }
 
     @ViewBuilder
     private func targetSummary(_ plan: PhasePlan) -> some View {
         if plan.energyStrategy == .manual, let target = plan.manualTarget {
-            LabeledContent("目标热量", value: "\(target.calories.formatted()) kcal")
-            LabeledContent("蛋白质／碳水／脂肪", value: "\(target.proteinGrams.formatted())／\(target.carbohydrateGrams.formatted())／\(target.fatGrams.formatted()) g")
+            DietKeyValueRow(title: "目标热量", value: DietFormat.calories(target.calories))
+            DietKeyValueRow(
+                title: "蛋白质／碳水／脂肪",
+                value: "\(DietFormat.number(target.proteinGrams))／\(DietFormat.number(target.carbohydrateGrams))／\(DietFormat.number(target.fatGrams)) g"
+            )
         } else {
-            LabeledContent("热量调整规则", value: "\(plan.energyAdjustmentPercent?.formatted() ?? "0")%")
-            LabeledContent("蛋白质系数", value: "\(plan.macroRule.proteinGramsPerKilogram.formatted()) g/kg")
-            LabeledContent("脂肪供能比例", value: "\((plan.macroRule.fatEnergyProportion * 100).formatted())%")
+            DietKeyValueRow(title: "热量调整规则", value: "\(DietFormat.number(plan.energyAdjustmentPercent ?? 0))%")
+            DietKeyValueRow(title: "蛋白质系数", value: "\(DietFormat.number(plan.macroRule.proteinGramsPerKilogram)) g/kg")
+            DietKeyValueRow(title: "脂肪供能比例", value: "\(DietFormat.number(plan.macroRule.fatEnergyProportion * 100))%")
             Text("今日页面会按当天档案生成并保存目标，之后修改档案不会重写历史目标。")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.caption)
+                .foregroundStyle(DietTheme.Palette.inkSecondary)
         }
+    }
+
+    private func listValue(_ values: [String]) -> String {
+        values.isEmpty ? "未填写" : values.joined(separator: "、")
     }
 
     private func dateRange(_ plan: PhasePlan) -> String {

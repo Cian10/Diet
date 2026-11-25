@@ -53,33 +53,68 @@ public struct RecommendationSectionView: View {
     @ObservedObject var viewModel: RecommendationViewModel
 
     public var body: some View {
-        Section("今日建议") {
-            Toggle("接下来有训练", isOn: $viewModel.hasUpcomingWorkout)
-                .onChange(of: viewModel.hasUpcomingWorkout) { _, _ in viewModel.load() }
-            if viewModel.recommendations.isEmpty {
-                Text("确认今日目标后，这里会显示本地规则建议。").foregroundStyle(.secondary)
-            }
-            ForEach(viewModel.recommendations) { recommendation in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(recommendation.title).font(.headline)
-                        Spacer()
-                        Button("忽略") { viewModel.dismiss(recommendation) }
-                            .font(.caption)
+        DietCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    DietSectionHeader(title: "今日建议", subtitle: "由本地规则生成")
+                    Toggle("接下来有训练", isOn: $viewModel.hasUpcomingWorkout)
+                        .toggleStyle(.switch)
+                        .tint(DietTheme.Palette.primary)
+                        .font(.footnote)
+                        .onChange(of: viewModel.hasUpcomingWorkout) { _, _ in viewModel.load() }
+                }
+
+                if viewModel.recommendations.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle")
+                            .foregroundStyle(DietTheme.Palette.primaryText)
+                            .accessibilityHidden(true)
+                        Text("确认今日目标后，这里会显示适合当前记录的建议。")
+                            .font(.footnote)
+                            .foregroundStyle(DietTheme.Palette.inkSecondary)
                     }
-                    Text(recommendation.reason).font(.subheadline).foregroundStyle(.secondary)
-                    ForEach(recommendation.suggestions) { suggestion in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(suggestion.name) · \(suggestion.portionDescription)")
-                            Text("预计 \(suggestion.expectedNutrition.calories.formatted()) kcal，蛋白质 \(suggestion.expectedNutrition.proteinGrams.formatted()) g，碳水 \(suggestion.expectedNutrition.carbohydrateGrams.formatted()) g")
-                                .font(.caption).foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+                }
+
+                ForEach(Array(viewModel.recommendations.enumerated()), id: \.element.id) { index, recommendation in
+                    if index > 0 { Divider().overlay(DietTheme.Palette.border) }
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .top) {
+                            Text(recommendation.title)
+                                .font(.headline)
+                                .foregroundStyle(DietTheme.Palette.ink)
+                            Spacer()
+                            Button("忽略") { viewModel.dismiss(recommendation) }
+                                .buttonStyle(.dietText)
+                                .font(.caption)
+                        }
+                        Text(recommendation.reason)
+                            .font(.footnote)
+                            .foregroundStyle(DietTheme.Palette.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        ForEach(recommendation.suggestions) { suggestion in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(suggestion.name) · \(suggestion.portionDescription)")
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(DietTheme.Palette.ink)
+                                Text("预计 \(DietFormat.calories(suggestion.expectedNutrition.calories))，蛋白质 \(DietFormat.grams(suggestion.expectedNutrition.proteinGrams))，碳水 \(DietFormat.grams(suggestion.expectedNutrition.carbohydrateGrams))")
+                                    .font(.caption)
+                                    .foregroundStyle(DietTheme.Palette.inkSecondary)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background {
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .fill(DietTheme.Palette.surfaceMuted)
+                            }
                         }
                     }
                 }
-                .padding(.vertical, 4)
+
+                Text("食物营养使用 App 内置通用参考值；建议不会替代医疗意见。")
+                    .font(.caption)
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
             }
-            Text("食物营养使用 App 内置通用参考值；建议不会替代医疗意见。")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 }

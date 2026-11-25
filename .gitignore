@@ -1,6 +1,7 @@
 .build/
 .build-native/
 .build-native-swiftdata/
+.build-ui/
 .swiftpm/
 .tooling-home/
 DerivedData/

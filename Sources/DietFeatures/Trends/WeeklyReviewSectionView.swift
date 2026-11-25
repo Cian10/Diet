@@ -74,31 +74,59 @@ public struct WeeklyReviewSectionView: View {
     var onChanged: () -> Void
 
     public var body: some View {
-        Section("每周复盘") {
-            Text(viewModel.explanation)
-            if let proposal = viewModel.proposal {
-                LabeledContent("状态", value: proposal.status.displayName)
-                LabeledContent("生效日期", value: proposal.effectiveDate.formatted(date: .abbreviated, time: .omitted))
-                if let old = proposal.oldCalories, let new = proposal.newCalories {
-                    LabeledContent("目标热量", value: "\(old.formatted()) → \(new.formatted()) kcal")
-                }
-                Text(proposal.triggerSummary).font(.footnote).foregroundStyle(.secondary)
-                if proposal.status == .pending {
-                    Button("接受并创建新阶段版本") {
-                        viewModel.accept()
-                        onChanged()
-                    }
-                    Button("拒绝此建议", role: .destructive) {
-                        viewModel.reject()
-                        onChanged()
+        DietCard {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack {
+                    DietSectionHeader(
+                        title: "周期复盘与调整建议",
+                        subtitle: viewModel.proposal?.status == .pending ? "1 项待确认" : nil
+                    )
+                    if let status = viewModel.proposal?.status {
+                        DietStatusBadge(
+                            status: status == .pending ? .pending : status == .accepted ? .confirmed : .neutral,
+                            title: status.displayName
+                        )
                     }
                 }
+
+                Text(viewModel.explanation.isEmpty ? "正在读取本周复盘…" : viewModel.explanation)
+                    .font(.body)
+                    .foregroundStyle(DietTheme.Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let proposal = viewModel.proposal {
+                    DietKeyValueRow(title: "生效日期", value: proposal.effectiveDate.formatted(date: .abbreviated, time: .omitted))
+                    if let old = proposal.oldCalories, let new = proposal.newCalories {
+                        DietKeyValueRow(title: "目标热量", value: "\(DietFormat.calories(old)) → \(DietFormat.calories(new))")
+                    }
+                    Text(proposal.triggerSummary)
+                        .font(.footnote)
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if proposal.status == .pending {
+                        HStack(spacing: 12) {
+                            Button("接受并创建新阶段版本") {
+                                viewModel.accept()
+                                onChanged()
+                            }
+                            .buttonStyle(.dietPrimary)
+                            Button("拒绝此建议", role: .destructive) {
+                                viewModel.reject()
+                                onChanged()
+                            }
+                            .buttonStyle(.dietText)
+                            .foregroundStyle(DietTheme.Palette.danger)
+                        }
+                    }
+                }
+
+                if let error = viewModel.errorMessage {
+                    DietInlineNotice(.error, message: error)
+                }
+                Text("单日偏差不会触发长期目标调整；接受建议前不会修改阶段。")
+                    .font(.caption)
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
             }
-            if let error = viewModel.errorMessage {
-                Text(error).foregroundStyle(.red)
-            }
-            Text("单日偏差不会触发长期目标调整；接受建议前不会修改阶段。")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 }

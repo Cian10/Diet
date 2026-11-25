@@ -68,32 +68,80 @@ public struct LLMSettingsView: View {
     }
 
     public var body: some View {
-        Form {
-            Section("OpenAI 兼容接口") {
-                TextField("Base URL", text: $viewModel.baseURL)
-                    .autocorrectionDisabled()
-                TextField("模型名称", text: $viewModel.model)
-                    .autocorrectionDisabled()
-                SecureField(viewModel.hasStoredKey ? "输入新 Key 以替换" : "API Key", text: $viewModel.apiKey)
-                Text(viewModel.hasStoredKey ? "API Key 已保存在 Keychain。" : "API Key 将保存在 Keychain，不写入普通设置。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        DietPage {
+            DietPageHeader(title: "模型设置", subtitle: "配置 OpenAI 兼容接口，用于你主动发起的饮食分析。") {
+                DietStatusBadge(
+                    status: viewModel.hasStoredKey ? .confirmed : .neutral,
+                    title: viewModel.hasStoredKey ? "Key 已保存" : "未保存 Key"
+                )
             }
-            Section {
-                Button("保存设置", action: save)
-                Button(viewModel.isTesting ? "正在测试…" : "保存并用“一个苹果”测试") {
-                    Task { await viewModel.testConnection() }
+
+            DietCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    DietSectionHeader(title: "OpenAI 兼容接口")
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Base URL").font(.footnote.weight(.medium))
+                        TextField("https://api.openai.com/v1", text: $viewModel.baseURL)
+                            .textFieldStyle(.roundedBorder)
+                            .autocorrectionDisabled()
+                    }
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("模型名称").font(.footnote.weight(.medium))
+                        TextField("输入供应商提供的模型名称", text: $viewModel.model)
+                            .textFieldStyle(.roundedBorder)
+                            .autocorrectionDisabled()
+                    }
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("API Key").font(.footnote.weight(.medium))
+                        SecureField(viewModel.hasStoredKey ? "输入新 Key 以替换" : "API Key", text: $viewModel.apiKey)
+                            .textFieldStyle(.roundedBorder)
+                        Text(viewModel.hasStoredKey ? "API Key 已保存在 Keychain，界面不会显示明文。" : "API Key 将保存在 Keychain，不写入普通设置。")
+                            .font(.caption)
+                            .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    }
                 }
-                .disabled(viewModel.isTesting)
-                if viewModel.hasStoredKey {
-                    Button("删除 API Key", role: .destructive, action: deleteKey)
-                }
-            } footer: {
-                Text("连接测试会发起一次真实 API 请求，可能产生少量费用。Base URL 可填写到 /v1，也可填写完整 /chat/completions 地址。")
+                .foregroundStyle(DietTheme.Palette.ink)
             }
+
+            DietCard {
+                VStack(alignment: .leading, spacing: 13) {
+                    DietSectionHeader(title: "保存与连接测试")
+                    HStack(spacing: 12) {
+                        Button("保存设置", action: save)
+                            .buttonStyle(.dietPrimary)
+                        Button {
+                            Task { await viewModel.testConnection() }
+                        } label: {
+                            if viewModel.isTesting {
+                                DietLoadingLabel(title: "正在测试…")
+                            } else {
+                                Text("保存并用“一个苹果”测试")
+                            }
+                        }
+                        .buttonStyle(.dietSecondary)
+                        .disabled(viewModel.isTesting)
+                    }
+                    if viewModel.hasStoredKey {
+                        Button("删除 API Key", role: .destructive, action: deleteKey)
+                            .buttonStyle(.dietText)
+                            .foregroundStyle(DietTheme.Palette.danger)
+                    }
+                    Text("连接测试会发起一次真实 API 请求，可能产生少量费用。Base URL 可填写到 /v1，也可填写完整 /chat/completions 地址。")
+                        .font(.caption)
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             if let status = viewModel.statusMessage {
-                Section("状态") { Text(status) }
+                DietInlineNotice(.info, title: "状态", message: status)
             }
+
+            DietInlineNotice(
+                .info,
+                title: "隐私边界",
+                message: "只有点击文本分析、图片识别或连接测试时，相关内容才会发送给当前配置的供应商。"
+            )
         }
         .navigationTitle("模型设置")
     }

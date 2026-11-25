@@ -39,7 +39,7 @@ public struct PhasePlanFormFields: View {
                     .dietDecimalKeyboard()
                 Text("活动系数包含日常训练；碳水由目标热量扣除蛋白质和脂肪后计算。")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
             } else {
                 TextField("目标热量，kcal", text: $state.caloriesText)
                     .dietDecimalKeyboard()

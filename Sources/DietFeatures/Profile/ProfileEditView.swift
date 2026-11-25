@@ -15,13 +15,18 @@ public struct ProfileEditView: View {
     public var body: some View {
         NavigationStack {
             Form {
-                ProfileFormFields(state: $state)
                 if let errorMessage {
                     Section {
-                        Text(errorMessage).foregroundStyle(.red)
+                        DietInlineNotice(.error, title: "无法保存", message: errorMessage)
                     }
+                    .listRowBackground(Color.clear)
                 }
+                ProfileFormFields(state: $state)
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(DietTheme.Palette.canvas)
+            .tint(DietTheme.Palette.primary)
             .navigationTitle("编辑个人档案")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -29,13 +34,16 @@ public struct ProfileEditView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }
+                        .keyboardShortcut(.return, modifiers: .command)
                 }
             }
         }
+        .frame(minWidth: 560, idealWidth: 620, minHeight: 620, idealHeight: 700)
     }
 
     private func save() {
         do {
+            errorMessage = nil
             try viewModel.saveProfile(state.makeInput())
             dismiss()
         } catch {

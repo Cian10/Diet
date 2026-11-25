@@ -15,13 +15,18 @@ public struct PhasePlanFormView: View {
     public var body: some View {
         NavigationStack {
             Form {
-                PhasePlanFormFields(state: $state)
                 if let errorMessage {
                     Section {
-                        Text(errorMessage).foregroundStyle(.red)
+                        DietInlineNotice(.error, title: "无法保存阶段", message: errorMessage)
                     }
+                    .listRowBackground(Color.clear)
                 }
+                PhasePlanFormFields(state: $state)
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(DietTheme.Palette.canvas)
+            .tint(DietTheme.Palette.primary)
             .navigationTitle("新阶段方案")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -29,13 +34,16 @@ public struct PhasePlanFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { save() }
+                        .keyboardShortcut(.return, modifiers: .command)
                 }
             }
         }
+        .frame(minWidth: 560, idealWidth: 620, minHeight: 560, idealHeight: 650)
     }
 
     private func save() {
         do {
+            errorMessage = nil
             let input = try state.makeInput()
             try viewModel.startNewPhase(input)
             dismiss()

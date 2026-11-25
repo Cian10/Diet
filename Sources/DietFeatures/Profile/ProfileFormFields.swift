@@ -41,7 +41,7 @@ public struct ProfileFormFields: View {
             TextField("过敏食物，用顿号分隔", text: $state.allergiesText, axis: .vertical)
             Text("过敏与忌口会在后续推荐模块中作为硬过滤条件。")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DietTheme.Palette.inkSecondary)
         }
     }
 }
