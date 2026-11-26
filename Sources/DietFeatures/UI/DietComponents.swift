@@ -21,8 +21,152 @@ struct DietCard<Content: View>: View {
                         RoundedRectangle(cornerRadius: DietTheme.Metrics.cardRadius, style: .continuous)
                             .stroke(DietTheme.Palette.border, lineWidth: 1)
                     }
-                    .shadow(color: DietTheme.Palette.ink.opacity(0.035), radius: 5, x: 0, y: 2)
+                    .shadow(color: DietTheme.Palette.ink.opacity(0.02), radius: 2, x: 0, y: 1)
             }
+    }
+}
+
+struct DietHairline: View {
+    var body: some View {
+        Rectangle()
+            .fill(DietTheme.Palette.hairline)
+            .frame(maxWidth: .infinity)
+            .frame(height: 0.5)
+            .accessibilityHidden(true)
+    }
+}
+
+struct DietGroupHeader<Trailing: View>: View {
+    let title: String
+    private let detail: String?
+    @ViewBuilder private let trailing: Trailing
+
+    init(_ title: String, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.detail = nil
+        self.trailing = trailing()
+    }
+
+    private init(title: String, detail: String?, trailing: Trailing) {
+        self.title = title
+        self.detail = detail
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title)
+                    .font(DietTheme.Typography.groupEyebrow)
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                if let detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                } else {
+                    trailing
+                }
+            }
+            DietHairline()
+        }
+    }
+}
+
+extension DietGroupHeader where Trailing == EmptyView {
+    init(_ title: String, detail: String? = nil) {
+        self.init(title: title, detail: detail, trailing: EmptyView())
+    }
+}
+
+struct DietHeroSurface<Content: View>: View {
+    var padding: CGFloat = DietTheme.Metrics.focusPadding
+    @ViewBuilder let content: Content
+
+    init(padding: CGFloat = 22, @ViewBuilder content: () -> Content) {
+        self.padding = padding
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: DietTheme.Metrics.focusRadius, style: .continuous)
+                    .fill(DietTheme.Palette.surface)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: DietTheme.Metrics.focusRadius, style: .continuous)
+                            .stroke(DietTheme.Palette.border, lineWidth: 1)
+                    }
+                    .shadow(color: DietTheme.Palette.ink.opacity(0.025), radius: 4, x: 0, y: 2)
+            }
+    }
+}
+
+struct DietFuelBar: View {
+    let progress: Double
+    let tint: Color
+    var height: CGFloat = 8
+    var hasUncertainTail: Bool = false
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var clampedProgress: Double {
+        progress.isFinite ? min(max(progress, 0), 1) : 0
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let totalWidth = max(proxy.size.width, 0)
+            let filledWidth = totalWidth * clampedProgress
+            let tailWidth = hasUncertainTail ? min(max(totalWidth * 0.14, 18), totalWidth) : 0
+            let solidWidth = hasUncertainTail
+                ? min(filledWidth, max(totalWidth - tailWidth, 0))
+                : filledWidth
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(DietTheme.Palette.surfaceMuted)
+                HStack(spacing: 0) {
+                    if solidWidth > 0 {
+                        Rectangle()
+                            .fill(tint)
+                            .frame(width: solidWidth)
+                    }
+                    if hasUncertainTail && tailWidth > 0 {
+                        UncertainHatchSegment(height: height)
+                            .frame(width: tailWidth)
+                    }
+                }
+            }
+            .clipShape(Capsule())
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: clampedProgress)
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct UncertainHatchSegment: View {
+    let height: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(DietTheme.Palette.warningSoft))
+            let stripeStep = max(5, height * 0.7)
+            let lineWidth = max(1.5, height * 0.22)
+            var path = Path()
+            var x = -size.height
+            while x < size.width + size.height {
+                path.move(to: CGPoint(x: x, y: size.height))
+                path.addLine(to: CGPoint(x: x + size.height, y: 0))
+                x += stripeStep
+            }
+            context.stroke(path, with: .color(DietTheme.Palette.warning), lineWidth: lineWidth)
+        }
     }
 }
 
@@ -43,132 +187,6 @@ struct DietSectionHeader: View {
                     .foregroundStyle(DietTheme.Palette.inkSecondary)
             }
         }
-    }
-}
-
-struct DietFocusCard: View {
-    enum Tone {
-        case normal
-        case attention
-    }
-
-    let title: String
-    let message: String
-    let actionTitle: String
-    var progress: Double? = nil
-    var progressCaption: String? = nil
-    var tone: Tone = .normal
-    let action: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 24) {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("今日重点", systemImage: tone == .attention ? "checklist" : "sparkles")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(tone == .attention ? DietTheme.Palette.warning : DietTheme.Palette.primaryText)
-                Text(title)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(DietTheme.Palette.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(message)
-                    .font(.body)
-                    .foregroundStyle(DietTheme.Palette.inkSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button(actionTitle, action: action)
-                    .buttonStyle(DietPrimaryButtonStyle(isOnFocus: true))
-                    .padding(.top, 2)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if let progress {
-                VStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .stroke(DietTheme.Palette.primaryLine, lineWidth: 7)
-                        Circle()
-                            .trim(from: 0, to: min(max(progress, 0), 1))
-                            .stroke(DietTheme.Palette.primary, style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                        Text(progress.formatted(.percent.precision(.fractionLength(0))))
-                            .font(.title3.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(DietTheme.Palette.primaryText)
-                    }
-                    .frame(width: 78, height: 78)
-                    Text(progressCaption ?? "今日热量进度")
-                        .font(.caption)
-                        .foregroundStyle(DietTheme.Palette.inkSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(width: 100)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(progressCaption ?? "今日热量进度") \(progress.formatted(.percent.precision(.fractionLength(0))))")
-            }
-        }
-        .padding(DietTheme.Metrics.focusPadding)
-        .frame(maxWidth: .infinity)
-        .background {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: DietTheme.Metrics.focusRadius, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: tone == .attention
-                            ? [DietTheme.Palette.warningSoft, DietTheme.Palette.surface]
-                            : [DietTheme.Palette.primarySoft, DietTheme.Palette.surface],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                Circle()
-                    .stroke(tone == .attention ? DietTheme.Palette.warning.opacity(0.12) : DietTheme.Palette.primaryLine.opacity(0.65), lineWidth: 18)
-                    .frame(width: 150, height: 150)
-                    .offset(x: 56, y: -86)
-                    .accessibilityHidden(true)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: DietTheme.Metrics.focusRadius, style: .continuous))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: DietTheme.Metrics.focusRadius, style: .continuous)
-                .stroke(tone == .attention ? DietTheme.Palette.warning.opacity(0.25) : DietTheme.Palette.primaryLine, lineWidth: 1)
-        }
-    }
-}
-
-struct DietMetricCard: View {
-    let label: String
-    let value: String
-    let unit: String
-    let systemImage: String
-    var footnote: String? = nil
-
-    var body: some View {
-        DietCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 7) {
-                    Image(systemName: systemImage)
-                        .foregroundStyle(DietTheme.Palette.primaryText)
-                        .accessibilityHidden(true)
-                    Text(label)
-                        .font(.footnote)
-                        .foregroundStyle(DietTheme.Palette.inkSecondary)
-                }
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(value)
-                        .font(DietTheme.Typography.metric)
-                        .monospacedDigit()
-                        .foregroundStyle(DietTheme.Palette.ink)
-                        .minimumScaleFactor(0.8)
-                    Text(unit)
-                        .font(.caption)
-                        .foregroundStyle(DietTheme.Palette.inkSecondary)
-                }
-                if let footnote {
-                    Text(footnote)
-                        .font(.caption)
-                        .foregroundStyle(DietTheme.Palette.inkSecondary)
-                        .lineLimit(2)
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -198,7 +216,7 @@ struct DietStatusBadge: View {
     private var foreground: Color {
         switch status {
         case .confirmed: DietTheme.Palette.primaryText
-        case .pending, .estimated: DietTheme.Palette.warning
+        case .pending, .estimated: DietTheme.Palette.ink
         case .failed: DietTheme.Palette.danger
         case .neutral: DietTheme.Palette.inkSecondary
         }
@@ -213,14 +231,26 @@ struct DietStatusBadge: View {
         }
     }
 
+    private var showsWarningDot: Bool {
+        status == .pending || status == .estimated
+    }
+
     var body: some View {
-        Text(text)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(foreground)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background { Capsule().fill(background) }
-            .fixedSize()
+        HStack(spacing: 5) {
+            if showsWarningDot {
+                Circle()
+                    .fill(DietTheme.Palette.warning)
+                    .frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+            }
+            Text(text)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(foreground)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background { Capsule().fill(background) }
+        .fixedSize()
     }
 }
 
@@ -253,49 +283,75 @@ struct DietMealIcon: View {
 struct DietMealRow: View {
     let entry: MealEntry
     var showsDate = false
+    var showsMealIcon = true
+    var showsMealTypeInSubtitle = true
 
     private var title: String {
         entry.components.isEmpty ? "尚未添加食物" : entry.components.map(\.displayName).joined(separator: "、")
     }
 
-    private var status: DietStatusBadge.Status {
+    private var nutrition: String {
+        guard entry.isConfirmed else { return entry.status.displayName }
+        if entry.components.isEmpty { return "等待补充食物" }
+        let totals = NutritionCalculator().mealNutrition(entry)
+        let caloriesText = DietFormat.calories(totals.calories)
+        let proteinText = "蛋白 \(DietFormat.number(totals.proteinGrams, maximumFractionDigits: 0))g"
+        let base = "\(caloriesText) · \(proteinText)"
+        return totals.isComplete ? base : "\(base) · 部分未知"
+    }
+
+    private var subtitleItems: [String] {
+        var items: [String] = []
+        if showsDate {
+            items.append(entry.consumedAt.formatted(date: .abbreviated, time: .omitted))
+        }
+        if showsMealTypeInSubtitle {
+            items.append(entry.mealType.displayName)
+        }
+        items.append(DietFormat.time(entry.consumedAt))
+        items.append(nutrition)
+        return items
+    }
+
+    private var statusDotColor: Color {
         switch entry.status {
-        case .confirmed: .confirmed
-        case .draft: .pending
-        case .failed: .failed
+        case .confirmed: DietTheme.Palette.primary
+        case .draft: DietTheme.Palette.warning
+        case .failed: DietTheme.Palette.danger
         }
     }
 
-    private var nutrition: String {
-        guard entry.isConfirmed else { return entry.status.displayName }
-        let totals = NutritionCalculator().mealNutrition(entry)
-        if entry.components.isEmpty { return "等待补充食物" }
-        let known = DietFormat.calories(totals.calories)
-        return totals.isComplete ? known : "\(known) · 部分未知"
+    private var statusTextColor: Color {
+        switch entry.status {
+        case .confirmed: DietTheme.Palette.inkSecondary
+        case .draft: DietTheme.Palette.ink
+        case .failed: DietTheme.Palette.danger
+        }
+    }
+
+    private var statusText: String {
+        switch entry.status {
+        case .confirmed: "已确认"
+        case .draft: "待确认"
+        case .failed: "分析失败"
+        }
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            DietMealIcon(mealType: entry.mealType)
+            if showsMealIcon {
+                DietMealIcon(mealType: entry.mealType)
+            }
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
                     .font(.body.weight(.medium))
                     .foregroundStyle(DietTheme.Palette.ink)
                     .lineLimit(2)
-                HStack(spacing: 5) {
-                    if showsDate {
-                        Text(entry.consumedAt.formatted(date: .abbreviated, time: .omitted))
-                        Text("·")
-                    }
-                    Text(entry.mealType.displayName)
-                    Text("·")
-                    Text(DietFormat.time(entry.consumedAt))
-                    Text("·")
-                    Text(nutrition)
-                }
-                .font(.caption)
-                .foregroundStyle(DietTheme.Palette.inkSecondary)
-                .lineLimit(1)
+                Text(subtitleItems.joined(separator: " · "))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    .lineLimit(1)
                 if let note = entry.note, !note.isEmpty {
                     Text(note)
                         .font(.caption)
@@ -304,7 +360,16 @@ struct DietMealRow: View {
                 }
             }
             Spacer(minLength: 8)
-            DietStatusBadge(status: status)
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(statusDotColor)
+                    .frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+                Text(statusText)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(statusTextColor)
+            }
+            .fixedSize()
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(DietTheme.Palette.inkSecondary)

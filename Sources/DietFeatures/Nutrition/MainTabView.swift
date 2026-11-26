@@ -50,10 +50,17 @@ public struct MainTabView: View {
     public var body: some View {
         #if os(macOS)
         NavigationSplitView {
-            DietSidebar(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 218, max: 240)
+            DietSidebar(
+                selection: $selection,
+                phaseSummary: phaseSummary,
+                weightSummary: weightSummary
+            )
+            .navigationSplitViewColumnWidth(min: 200, ideal: 218, max: 240)
         } detail: {
             destination(for: selection)
+        }
+        .background {
+            keyboardShortcuts
         }
         #else
         TabView(selection: $selection) {
@@ -75,6 +82,38 @@ public struct MainTabView: View {
         }
         #endif
     }
+
+    #if os(macOS)
+    private var phaseSummary: String {
+        if let currentPlan = profileViewModel.plans.first(where: { $0.contains(Date()) }) {
+            return "\(currentPlan.phaseType.displayName) · v\(currentPlan.version)"
+        }
+        return "未设置阶段"
+    }
+
+    private var weightSummary: String? {
+        profileViewModel.profile?.currentWeightKilograms.map { "\(DietFormat.number($0)) kg" }
+    }
+
+    private var keyboardShortcuts: some View {
+        Group {
+            Button("今天") { selection = .today }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("日记") { selection = .diary }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("趋势") { selection = .trends }
+                .keyboardShortcut("3", modifiers: .command)
+            Button("AI 分析") { selection = .analysis }
+                .keyboardShortcut("4", modifiers: .command)
+            Button("我的") { selection = .profile }
+                .keyboardShortcut("5", modifiers: .command)
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+    #endif
 
     @ViewBuilder
     private func destination(for tab: AppTab) -> some View {
@@ -119,7 +158,8 @@ public struct MainTabView: View {
                 profileViewModel: profileViewModel,
                 configurationStore: configurationStore,
                 keyStore: keyStore,
-                provider: llmProvider
+                provider: llmProvider,
+                targetStore: targetStore
             )
         }
     }
@@ -134,7 +174,22 @@ public struct SettingsHubView: View {
     let configurationStore: LLMConfigurationStoring
     let keyStore: APIKeyStoring
     let provider: LLMClientProviding
+    let targetStore: DailyTargetStoring?
     @State private var isEditingProfile = false
+
+    public init(
+        profileViewModel: ProfileRootViewModel,
+        configurationStore: LLMConfigurationStoring,
+        keyStore: APIKeyStoring,
+        provider: LLMClientProviding,
+        targetStore: DailyTargetStoring? = nil
+    ) {
+        self.profileViewModel = profileViewModel
+        self.configurationStore = configurationStore
+        self.keyStore = keyStore
+        self.provider = provider
+        self.targetStore = targetStore
+    }
 
     private var currentPlan: PhasePlan? {
         profileViewModel.plans.first(where: { $0.contains(Date()) })
@@ -143,7 +198,7 @@ public struct SettingsHubView: View {
     public var body: some View {
         NavigationStack {
             DietPage {
-                DietPageHeader(title: "我的", subtitle: "管理个人目标与偏好，数据默认保存在本机。") {
+                DietPageHeader(title: "我的", subtitle: nil) {
                     Button("编辑档案") { isEditingProfile = true }
                         .buttonStyle(.dietSecondary)
                         .disabled(profileViewModel.profile == nil)
@@ -166,11 +221,16 @@ public struct SettingsHubView: View {
                     }
                 }
 
-                DietInlineNotice(
-                    .info,
-                    title: "本地优先",
-                    message: "身体数据、饮食记录与原图默认保存在本机。只有主动分析时，相关文本或图片才会发送给所配置的模型供应商。"
-                )
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "lock.shield")
+                        .font(.footnote)
+                        .accessibilityHidden(true)
+                    Text("隐私与数据：身体数据、饮食记录与原图默认保存在本机。只有主动分析时，相关文本或图片才会发送给所配置的模型供应商。")
+                        .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(DietTheme.Palette.inkSecondary)
+                .padding(.top, 4)
             }
             .navigationTitle("我的")
             .onAppear { profileViewModel.reload() }
@@ -264,17 +324,14 @@ public struct SettingsHubView: View {
                 )
             }
             .buttonStyle(.plain)
-
-            DietSettingsCard(
-                title: "隐私与数据",
-                value: "本地保存 · 仅主动分析时上传",
-                systemImage: "lock.shield",
-                showsChevron: false
-            )
         }
     }
 
     private var targetSummary: String {
+        if let todayTarget = try? targetStore?.target(on: Date()) {
+            let base = "\(DietFormat.calories(todayTarget.calories)) · 蛋白质 \(DietFormat.grams(todayTarget.proteinGrams))"
+            return todayTarget.isSingleDayOverride ? "\(base)（单日修改）" : base
+        }
         guard let currentPlan else { return "尚未创建阶段目标" }
         if currentPlan.energyStrategy == .manual, let target = currentPlan.manualTarget {
             return "\(DietFormat.calories(target.calories)) · 蛋白质 \(DietFormat.grams(target.proteinGrams))"

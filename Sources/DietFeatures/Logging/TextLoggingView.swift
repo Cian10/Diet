@@ -3,16 +3,36 @@ import DietCore
 
 @MainActor
 public final class TextLoggingViewModel: ObservableObject {
-    @Published public var text = ""
-    @Published public var consumedAt = Date()
-    @Published public var mealType: MealType = .other
+    @Published public var text: String
+    @Published public var consumedAt: Date
+    @Published public var mealType: MealType
     @Published public var draft: MealEntry?
     @Published public var isAnalyzing = false
     @Published public var errorMessage: String?
 
     public let service: FoodLoggingService
 
-    public init(service: FoodLoggingService) { self.service = service }
+    public init(
+        service: FoodLoggingService,
+        initialText: String = "",
+        initialMealType: MealType? = nil,
+        initialDate: Date = Date()
+    ) {
+        self.service = service
+        self.text = initialText
+        self.consumedAt = initialDate
+        self.mealType = initialMealType ?? Self.inferredMealType(for: initialDate)
+    }
+
+    public static func inferredMealType(for date: Date, calendar: Calendar = .current) -> MealType {
+        let hour = calendar.component(.hour, from: date)
+        switch hour {
+        case 5..<11: return .breakfast
+        case 11..<15: return .lunch
+        case 17..<22: return .dinner
+        default: return .snack
+        }
+    }
 
     public func analyze() async {
         isAnalyzing = true
@@ -45,15 +65,29 @@ public final class TextLoggingViewModel: ObservableObject {
 public struct TextLoggingView: View {
     @StateObject private var viewModel: TextLoggingViewModel
     @State private var isConfirming = false
+    @State private var hasTriggeredAutoAnalyze = false
+    private let autoAnalyzeOnAppear: Bool
     private let onSwitchToPhoto: () -> Void
     public var onConfirmed: () -> Void
 
     public init(
         service: FoodLoggingService,
+        initialText: String = "",
+        initialMealType: MealType? = nil,
+        initialDate: Date = Date(),
+        autoAnalyzeOnAppear: Bool = false,
         onSwitchToPhoto: @escaping () -> Void = {},
         onConfirmed: @escaping () -> Void = {}
     ) {
-        _viewModel = StateObject(wrappedValue: TextLoggingViewModel(service: service))
+        _viewModel = StateObject(
+            wrappedValue: TextLoggingViewModel(
+                service: service,
+                initialText: initialText,
+                initialMealType: initialMealType,
+                initialDate: initialDate
+            )
+        )
+        self.autoAnalyzeOnAppear = autoAnalyzeOnAppear
         self.onSwitchToPhoto = onSwitchToPhoto
         self.onConfirmed = onConfirmed
     }
@@ -98,6 +132,8 @@ public struct TextLoggingView: View {
                             .padding(8)
                             .frame(minHeight: 126)
                             .disabled(viewModel.isAnalyzing)
+                            .accessibilityLabel("食物描述")
+                            .accessibilityHint("输入食物与份量，可使用 Command 加 Return 开始分析")
                         if viewModel.text.isEmpty {
                             Text("例如：一个麦当劳汉堡、一份中薯条和一杯无糖可乐")
                                 .font(.body)
@@ -105,6 +141,7 @@ public struct TextLoggingView: View {
                                 .padding(.horizontal, 13)
                                 .padding(.vertical, 16)
                                 .allowsHitTesting(false)
+                                .accessibilityHidden(true)
                         }
                     }
                     .background {
@@ -160,6 +197,19 @@ public struct TextLoggingView: View {
             }
         }
         .navigationTitle("记一餐")
+        .task {
+            guard autoAnalyzeOnAppear,
+                  !hasTriggeredAutoAnalyze,
+                  viewModel.draft == nil,
+                  !trimmedText.isEmpty else {
+                return
+            }
+            hasTriggeredAutoAnalyze = true
+            await viewModel.analyze()
+            if viewModel.draft?.status == .draft {
+                isConfirming = true
+            }
+        }
         .navigationDestination(isPresented: $isConfirming) {
             if let draft = viewModel.draft {
                 MealConfirmationView(entry: draft, service: viewModel.service) {

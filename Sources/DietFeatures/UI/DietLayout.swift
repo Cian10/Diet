@@ -2,10 +2,10 @@ import SwiftUI
 
 struct DietPageHeader<Actions: View>: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
     @ViewBuilder let actions: Actions
 
-    init(title: String, subtitle: String, @ViewBuilder actions: () -> Actions) {
+    init(title: String, subtitle: String? = nil, @ViewBuilder actions: () -> Actions) {
         self.title = title
         self.subtitle = subtitle
         self.actions = actions()
@@ -26,22 +26,30 @@ struct DietPageHeader<Actions: View>: View {
         .accessibilityElement(children: .contain)
     }
 
+    private var nonEmptySubtitle: String? {
+        guard let subtitle else { return nil }
+        let trimmed = subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : subtitle
+    }
+
     private var heading: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: nonEmptySubtitle == nil ? 0 : 5) {
             Text(title)
                 .font(DietTheme.Typography.pageTitle)
                 .foregroundStyle(DietTheme.Palette.ink)
                 .accessibilityAddTraits(.isHeader)
-            Text(subtitle)
-                .font(.body)
-                .foregroundStyle(DietTheme.Palette.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if let subtitleText = nonEmptySubtitle {
+                Text(subtitleText)
+                    .font(.body)
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
 
 extension DietPageHeader where Actions == EmptyView {
-    init(title: String, subtitle: String) {
+    init(title: String, subtitle: String? = nil) {
         self.init(title: title, subtitle: subtitle) { EmptyView() }
     }
 }
@@ -62,6 +70,36 @@ struct DietPage<Content: View>: View {
             .padding(.top, 26)
             .padding(.bottom, 36)
             .frame(maxWidth: DietTheme.Metrics.contentWidth)
+            .frame(maxWidth: .infinity)
+        }
+        .background(DietTheme.Palette.paper.ignoresSafeArea())
+    }
+}
+
+struct DietWorkbenchPage<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    private var horizontalPadding: CGFloat {
+        #if os(macOS)
+        DietTheme.Metrics.pagePadding
+        #else
+        DietTheme.Metrics.compactPagePadding
+        #endif
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DietTheme.Metrics.sectionSpacing) {
+                content
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.top, 18)
+            .padding(.bottom, 36)
+            .frame(maxWidth: DietTheme.Metrics.workbenchMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .background(DietTheme.Palette.paper.ignoresSafeArea())

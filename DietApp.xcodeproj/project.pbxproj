@@ -52,6 +52,7 @@
 		AA1D5A5021DC07C608D30761 /* PhasePlanFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B3A2D536FB899A03B57386 /* PhasePlanFormView.swift */; };
 		B74A1A3DE165499C5873A2EF /* DietCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A2FE0424248790498A7E7A /* DietCore.framework */; };
 		BFEEAF4BA8117815F1806BDB /* DietFeatures.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C01C7FE48CD8C74F65F1F5F5 /* DietFeatures.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C2008E437D9EFF94FF4AB1A0 /* TodayDashboardComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8F78264544D284115C7F59 /* TodayDashboardComponents.swift */; };
 		C8D765B8425EBAB3C80322E4 /* RecommendationSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F375E8096E738318925A882 /* RecommendationSectionView.swift */; };
 		CAE7906E219F56841E10577A /* TrendsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85F468E4FC3CAB094366D6BA /* TrendsService.swift */; };
 		CDAC1671EEC9DFDFB191C6E9 /* DietCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 22A2FE0424248790498A7E7A /* DietCore.framework */; };
@@ -163,6 +164,7 @@
 		EECA3D8B4175F832110D6EA2 /* NutritionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionModels.swift; sourceTree = "<group>"; };
 		F059D55963862C010F70E60E /* DiaryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryModels.swift; sourceTree = "<group>"; };
 		F9D00AFF5D1985182884D214 /* AppNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotificationService.swift; sourceTree = "<group>"; };
+		FB8F78264544D284115C7F59 /* TodayDashboardComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayDashboardComponents.swift; sourceTree = "<group>"; };
 		FF73F5CE53E42236647BC182 /* ImageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -212,6 +214,7 @@
 				D5EEBC1A2B11C1225DD7005C /* AppRootView.swift */,
 				37BE1441DDAF66C503FCD96F /* MainTabView.swift */,
 				5A8DCA6F3778E008F639B5DA /* NutritionHomeView.swift */,
+				FB8F78264544D284115C7F59 /* TodayDashboardComponents.swift */,
 				2B1F5A4BF4F78F699355E1FB /* TodayFocusPresentation.swift */,
 				8510D99E6DF6A5B9020D4CD0 /* TodayTargetEditView.swift */,
 			);
@@ -634,6 +637,7 @@
 				11BB83DF461BAE6F272FC014 /* ProfileRootViewModel.swift in Sources */,
 				C8D765B8425EBAB3C80322E4 /* RecommendationSectionView.swift in Sources */,
 				0498B9CAC29A46FFD80CBB85 /* TextLoggingView.swift in Sources */,
+				C2008E437D9EFF94FF4AB1A0 /* TodayDashboardComponents.swift in Sources */,
 				9CA9E657D88591F348FD83EB /* TodayFocusPresentation.swift in Sources */,
 				6D674BF478FC4E4AEA8BE7D5 /* TodayTargetEditView.swift in Sources */,
 				555F5E12A1FB4F7A597DC7D3 /* TrendsView.swift in Sources */,

@@ -16,8 +16,11 @@ public final class NutritionHomeViewModel: ObservableObject {
     @Published public private(set) var target: TargetResolution?
     @Published public private(set) var intake = NutritionTotals()
     @Published public private(set) var entries: [MealEntry] = []
+    @Published public private(set) var weeklyDays: [DailyTrend] = []
     @Published public private(set) var weeklyTargetDays: Int?
     @Published public private(set) var weeklyEligibleDays = 0
+    @Published public private(set) var latestWeight: WeightRecord?
+    @Published public private(set) var weightDeltaText: String?
     @Published public var errorMessage: String?
 
     private let profileStore: ProfileStoring
@@ -49,8 +52,11 @@ public final class NutritionHomeViewModel: ObservableObject {
                 target = nil
                 entries = []
                 intake = NutritionTotals()
+                weeklyDays = []
                 weeklyTargetDays = nil
                 weeklyEligibleDays = 0
+                latestWeight = nil
+                weightDeltaText = nil
                 errorMessage = nil
                 return
             }
@@ -108,20 +114,51 @@ public final class NutritionHomeViewModel: ObservableObject {
     private func refreshHomeData() throws {
         entries = try mealStore.allEntries()
         intake = calculator.dailyNutrition(entries: entries, on: Date())
-        let days = try trendsService.dailyTrends()
+        let review = try trendsService.weeklyReview()
+        let days = review.days
+        weeklyDays = days
         let eligible = days.filter(\.isEligibleForTargetCompletion)
         weeklyEligibleDays = eligible.count
         weeklyTargetDays = eligible.isEmpty ? nil : eligible.filter(\.meetsCalorieTarget).count
+        if let delta = review.overview.weightChangeKilograms {
+            let prefix = delta >= 0 ? "+" : ""
+            weightDeltaText = "\(prefix)\(DietFormat.number(delta)) kg / \(review.overview.weightSpanDays) 天"
+        } else {
+            weightDeltaText = nil
+        }
+        latestWeight = try profileStore.allWeightRecords().max {
+            if $0.date != $1.date {
+                return $0.date < $1.date
+            }
+            return $0.createdAt < $1.createdAt
+        }
+    }
+}
+
+private enum HomeLoggingSheet: Identifiable {
+    case text(initialText: String = "", mealType: MealType? = nil, autoAnalyze: Bool = false)
+    case photo
+    case manual(MealEntry)
+
+    var id: String {
+        switch self {
+        case .text(let initialText, let mealType, let autoAnalyze):
+            return "text-\(initialText)-\(mealType?.rawValue ?? "auto")-\(autoAnalyze)"
+        case .photo:
+            return "photo"
+        case .manual(let entry):
+            return "manual-\(entry.id.uuidString)"
+        }
     }
 }
 
 public struct NutritionHomeView: View {
     @StateObject private var viewModel: NutritionHomeViewModel
     @StateObject private var recommendationViewModel: RecommendationViewModel
-    @State private var loggingRoute: DietLoggingRoute?
+    @State private var activeSheet: HomeLoggingSheet?
     @State private var focusedEntry: MealEntry?
     @State private var isEditingTarget = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var quickInputText = ""
 
     private let mealStore: MealEntryStoring
     private let llmProvider: LLMClientProviding
@@ -163,156 +200,72 @@ public struct NutritionHomeView: View {
         } else {
             goalMet = false
         }
+        let hour = Calendar.current.component(.hour, from: Date())
         return TodayFocusPresentation(
             hasTarget: viewModel.target != nil,
             hasPendingOrFailedMeal: todayEntries.contains { $0.status == .draft || $0.status == .failed },
-            hasDinner: todayEntries.contains { $0.mealType == .dinner },
+            recordedMealTypes: Set(todayEntries.map(\.mealType)),
+            hour: hour,
             isGoalMet: goalMet
         )
     }
 
-    private var calorieProgress: Double? {
-        guard let target = viewModel.target,
-              target.dailyTarget.calories > 0 else { return nil }
-        return viewModel.intake.calories / target.dailyTarget.calories
+    private var suggestedMealType: MealType {
+        let hour = Calendar.current.component(.hour, from: Date())
+        return TodayFocusPresentation.suggestedMealType(
+            for: hour,
+            recorded: Set(viewModel.todayEntries.map(\.mealType))
+        )
+    }
+
+    private var firstPendingEntry: MealEntry? {
+        viewModel.todayEntries.first { $0.status == .draft || $0.status == .failed }
     }
 
     public var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                DietPage {
-                    DietPageHeader(title: "今天", subtitle: "先完成最重要的一步，再查看今天的饮食概况。") {
-                        HStack(spacing: 10) {
-                            DietDateCapsule(date: Date())
-                            DietLoggingMenu(
-                                onText: { loggingRoute = .text },
-                                onPhoto: { loggingRoute = .photo }
-                            )
-                        }
+            GeometryReader { proxy in
+                DietWorkbenchPage {
+                    if proxy.size.width >= DietTheme.Metrics.twoColumnBreakpoint {
+                        wideWorkbench
+                    } else {
+                        narrowWorkbench
                     }
-
-                    if let error = viewModel.errorMessage {
-                        DietInlineNotice(.error, title: "需要处理", message: error)
-                    }
-
-                    DietFocusCard(
-                        title: focus.title,
-                        message: focus.message,
-                        actionTitle: focus.actionTitle,
-                        progress: calorieProgress,
-                        progressCaption: calorieProgress == nil ? nil : "今日热量进度",
-                        tone: focus.needsAttention ? .attention : .normal
-                    ) {
-                        performFocusAction(proxy: proxy)
-                    }
-
-                    if let target = viewModel.target {
-                        todayTargetCard(target)
-                    }
-
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 180, maximum: .infinity), spacing: 12)],
-                        spacing: 12
-                    ) {
-                        DietMetricCard(
-                            label: "已摄入热量",
-                            value: DietFormat.number(viewModel.intake.calories, maximumFractionDigits: 0),
-                            unit: "kcal",
-                            systemImage: "flame",
-                            footnote: viewModel.target.map { "目标 \(DietFormat.calories($0.dailyTarget.calories))" }
-                        )
-                        DietMetricCard(
-                            label: "蛋白质",
-                            value: DietFormat.number(viewModel.intake.proteinGrams),
-                            unit: "g",
-                            systemImage: "bolt.heart",
-                            footnote: viewModel.target.map { "目标 \(DietFormat.grams($0.dailyTarget.proteinGrams))" }
-                        )
-                        DietMetricCard(
-                            label: "本周达标天数",
-                            value: viewModel.weeklyTargetDays.map(String.init) ?? "—",
-                            unit: viewModel.weeklyTargetDays == nil ? "暂无完整数据" : "/ \(viewModel.weeklyEligibleDays) 天",
-                            systemImage: "checkmark.seal",
-                            footnote: "按热量目标 ±10% 计算"
-                        )
-                    }
-
-                    if !viewModel.intake.isComplete {
-                        let names = viewModel.intake.unknownItemNames.joined(separator: "、")
-                        DietInlineNotice(
-                            .warning,
-                            title: "当前为部分合计",
-                            message: names.isEmpty
-                                ? "仍有食物缺少可计算信息，未知项目没有按零摄入处理。"
-                                : "无法计算：\(names)。这些项目没有按零摄入处理。"
-                        )
-                    }
-
-                    if let assessment = viewModel.assessment {
-                        DietCard {
-                            VStack(spacing: 12) {
-                                DietSectionHeader(title: "目标参考", subtitle: "仅基于已确认记录")
-                                DietKeyValueRow(
-                                    title: "目标热量差额",
-                                    value: DietFormat.calories(assessment.targetCalorieDifference)
-                                )
-                                DietKeyValueRow(
-                                    title: "蛋白质剩余",
-                                    value: DietFormat.grams(assessment.remainingProteinGrams)
-                                )
-                                if let deficit = assessment.actualCalorieDeficit {
-                                    DietKeyValueRow(
-                                        title: "实际热量缺口（估算）",
-                                        value: DietFormat.calories(deficit)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    RecommendationSectionView(viewModel: recommendationViewModel)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        DietSectionHeader(
-                            title: "今天吃过",
-                            subtitle: viewModel.todayEntries.isEmpty ? nil : "\(viewModel.todayEntries.count) 条记录"
-                        )
-                        DietCard(padding: 12) {
-                            if viewModel.todayEntries.isEmpty {
-                                DietEmptyState(
-                                    title: "今天还没有记录",
-                                    message: "从下一餐开始，确认后的食物会显示在这里。"
-                                ) {
-                                    Button("记录第一餐") { loggingRoute = .text }
-                                        .buttonStyle(.dietSecondary)
-                                }
-                            } else {
-                                ForEach(Array(viewModel.todayEntries.prefix(8).enumerated()), id: \.element.id) { index, entry in
-                                    NavigationLink {
-                                        MealDetailView(
-                                            entry: entry,
-                                            service: foodService,
-                                            imageStore: imageStore,
-                                            onChanged: { reload() },
-                                            onDelete: { deletingImage in
-                                                viewModel.delete(entry, deletingImage: deletingImage, imageStore: imageStore)
-                                            }
-                                        )
-                                    } label: {
-                                        DietMealRow(entry: entry)
-                                    }
-                                    .buttonStyle(.plain)
-                                    if index < min(viewModel.todayEntries.count, 8) - 1 {
-                                        Divider().overlay(DietTheme.Palette.border)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .id("today-records")
                 }
             }
             .navigationTitle("今天")
+            .toolbar {
+                #if os(macOS)
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Text(DietFormat.day(Date()))
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                        .padding(.horizontal, 6)
+                        .accessibilityLabel("日期：\(DietFormat.day(Date()))")
+                    addMealMenu
+                }
+                #else
+                ToolbarItem(placement: .topBarLeading) {
+                    Text(DietFormat.day(Date()))
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                        .accessibilityLabel("日期：\(DietFormat.day(Date()))")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    addMealMenu
+                }
+                #endif
+            }
+            .background {
+                Button("记一餐") {
+                    activeSheet = .text()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
             .onAppear { reload() }
             .navigationDestination(isPresented: Binding(
                 get: { focusedEntry != nil },
@@ -325,83 +278,272 @@ public struct NutritionHomeView: View {
                     }
                 }
             }
-            .sheet(item: $loggingRoute) { route in
+            .sheet(item: $activeSheet, onDismiss: { reload() }) { sheet in
                 NavigationStack {
-                    loggingDestination(route)
+                    loggingDestination(sheet)
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
-                                Button("关闭") { loggingRoute = nil }
+                                Button("关闭") { activeSheet = nil }
                             }
                         }
                 }
+                #if os(macOS)
                 .frame(minWidth: 620, idealWidth: 680, minHeight: 640, idealHeight: 700)
+                #endif
             }
             .sheet(isPresented: $isEditingTarget) {
                 if let target = viewModel.target {
                     TodayTargetEditView(initialTarget: target.dailyTarget) { manualTarget in
                         try viewModel.updateTodayTarget(manualTarget)
+                        recommendationViewModel.load()
                     }
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private func todayTargetCard(_ target: TargetResolution) -> some View {
-        DietCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    DietSectionHeader(title: "今日目标")
-                    DietStatusBadge(
-                        status: .confirmed,
-                        title: target.dailyTarget.isSingleDayOverride ? "单日修改" : "已生效"
-                    )
-                    Button("修改") { isEditingTarget = true }
-                        .buttonStyle(.dietText)
+    private var wideWorkbench: some View {
+        HStack(alignment: .top, spacing: DietTheme.Metrics.sectionSpacing) {
+            VStack(alignment: .leading, spacing: DietTheme.Metrics.sectionSpacing) {
+                if let error = viewModel.errorMessage {
+                    errorBanner(error)
                 }
-                DietKeyValueRow(title: "目标热量", value: DietFormat.calories(target.dailyTarget.calories))
-                DietKeyValueRow(title: "蛋白质", value: DietFormat.grams(target.dailyTarget.proteinGrams))
-                DietKeyValueRow(title: "碳水化合物", value: DietFormat.grams(target.dailyTarget.carbohydrateGrams))
-                DietKeyValueRow(title: "脂肪", value: DietFormat.grams(target.dailyTarget.fatGrams))
-                if let bmr = target.basalMetabolicRate {
-                    DietKeyValueRow(title: "估算基础代谢", value: DietFormat.calories(bmr))
+
+                macroDashboardCard
+                mealTimelineSection
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: DietTheme.Metrics.sectionSpacing) {
+                if focus.needsAttention {
+                    attentionBanner
                 }
-                ForEach(target.warnings, id: \.self) { warning in
-                    DietInlineNotice(.warning, message: warning.displayName)
+
+                RecommendationSectionView(viewModel: recommendationViewModel)
+                weeklyRhythmPanel
+            }
+            .frame(
+                minWidth: DietTheme.Metrics.railMinWidth,
+                idealWidth: 320,
+                maxWidth: DietTheme.Metrics.railMaxWidth,
+                alignment: .leading
+            )
+        }
+    }
+
+    private var narrowWorkbench: some View {
+        VStack(alignment: .leading, spacing: DietTheme.Metrics.sectionSpacing) {
+            if let error = viewModel.errorMessage {
+                errorBanner(error)
+            }
+
+            macroDashboardCard
+
+            if focus.needsAttention {
+                attentionBanner
+            }
+
+            mealTimelineSection
+            RecommendationSectionView(viewModel: recommendationViewModel)
+            weeklyRhythmPanel
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var macroDashboardCard: some View {
+        TodayMacroDashboardCard(
+            target: viewModel.target,
+            intake: viewModel.intake,
+            assessment: viewModel.assessment,
+            onEditTarget: { isEditingTarget = true },
+            onTapIncomplete: { openIncompleteEntry() }
+        )
+    }
+
+    private var mealTimelineSection: some View {
+        TodayMealTimelineSection(
+            entries: viewModel.todayEntries,
+            suggestedMealType: suggestedMealType,
+            quickInputText: $quickInputText,
+            onQuickAnalyze: { text, mealType in
+                activeSheet = .text(initialText: text, mealType: mealType, autoAnalyze: true)
+            },
+            onOpenPhoto: {
+                activeSheet = .photo
+            },
+            onOpenManual: { mealType in
+                openManualLogging(mealType: mealType)
+            }
+        ) { entry in
+            MealDetailView(
+                entry: entry,
+                service: foodService,
+                imageStore: imageStore,
+                onChanged: { reload() },
+                onDelete: { deletingImage in
+                    let deleted = viewModel.delete(entry, deletingImage: deletingImage, imageStore: imageStore)
+                    if deleted {
+                        recommendationViewModel.load()
+                    }
+                    return deleted
                 }
-                Text(target.dailyTarget.isSingleDayOverride
-                    ? "单日修改只影响今天，不改变阶段方案。"
-                    : "目标已按当前阶段方案生成并保存；修改只影响今天。")
+            )
+        }
+    }
+
+    private var weeklyRhythmPanel: some View {
+        TodayWeeklyRhythmPanel(
+            days: viewModel.weeklyDays,
+            eligibleDays: viewModel.weeklyEligibleDays,
+            metDays: viewModel.weeklyTargetDays,
+            latestWeight: viewModel.latestWeight,
+            weightDeltaText: viewModel.weightDeltaText,
+            onJumpToTrends: nil
+        )
+    }
+
+    private var addMealMenu: some View {
+        Menu {
+            Button {
+                activeSheet = .text()
+            } label: {
+                Label("文字记录", systemImage: "text.quote")
+            }
+
+            Button {
+                activeSheet = .photo
+            } label: {
+                Label("图片识别", systemImage: "photo")
+            }
+
+            Button {
+                openManualLogging(mealType: suggestedMealType)
+            } label: {
+                Label("手动记录", systemImage: "square.and.pencil")
+            }
+        } label: {
+            Label("记一餐", systemImage: "plus")
+                .labelStyle(.titleAndIcon)
+        }
+        .accessibilityLabel("记一餐")
+        .accessibilityHint("选择文字记录、图片识别或手动记录，快捷键 Command 加 N")
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.body)
+                .foregroundStyle(DietTheme.Palette.danger)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("需要处理")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(DietTheme.Palette.ink)
+                Text(message)
                     .font(.footnote)
-                    .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    .foregroundStyle(DietTheme.Palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: DietTheme.Metrics.cardRadius, style: .continuous)
+                .fill(DietTheme.Palette.dangerSoft)
+                .overlay {
+                    RoundedRectangle(cornerRadius: DietTheme.Metrics.cardRadius, style: .continuous)
+                        .stroke(DietTheme.Palette.danger.opacity(0.35), lineWidth: 1)
+                }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var attentionBanner: some View {
+        Button {
+            if let pending = firstPendingEntry {
+                focusedEntry = pending
+            }
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "checklist")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DietTheme.Palette.warning)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(focus.title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(DietTheme.Palette.ink)
+                    Text(focus.message)
+                        .font(.caption)
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(focus.actionTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DietTheme.Palette.primaryText)
+                    .fixedSize()
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: DietTheme.Metrics.cardRadius, style: .continuous)
+                    .fill(DietTheme.Palette.warningSoft)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: DietTheme.Metrics.cardRadius, style: .continuous)
+                            .stroke(DietTheme.Palette.warning.opacity(0.3), lineWidth: 1)
+                    }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(focus.title)，\(focus.message)")
+        .accessibilityHint("点击\(focus.actionTitle)")
+    }
+
+    private func openIncompleteEntry() {
+        let calculator = NutritionCalculator()
+        let candidate = viewModel.todayEntries.first {
+            $0.isConfirmed && !calculator.mealNutrition($0).isComplete
+        } ?? viewModel.todayEntries.first {
+            !calculator.mealNutrition($0).isComplete
+        } ?? firstPendingEntry
+        if let candidate {
+            focusedEntry = candidate
+        } else {
+            activeSheet = .text(mealType: suggestedMealType)
         }
     }
 
-    private func performFocusAction(proxy: ScrollViewProxy) {
-        switch focus.kind {
-        case .reviewMeal:
-            focusedEntry = viewModel.todayEntries.first { $0.status == .draft || $0.status == .failed }
-        case .startLogging, .recordDinner:
-            loggingRoute = .text
-        case .completed, .maintain:
-            if reduceMotion {
-                proxy.scrollTo("today-records", anchor: .top)
-            } else {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    proxy.scrollTo("today-records", anchor: .top)
-                }
-            }
+    private func openManualLogging(mealType: MealType) {
+        do {
+            let entry = try foodService.createManualEntry(consumedAt: Date(), mealType: mealType)
+            activeSheet = .manual(entry)
+        } catch {
+            viewModel.errorMessage = error.localizedDescription
         }
     }
 
     @ViewBuilder
-    private func loggingDestination(_ route: DietLoggingRoute) -> some View {
-        switch route {
-        case .text:
-            TextLoggingView(service: foodService, onSwitchToPhoto: { loggingRoute = .photo }) {
-                loggingRoute = nil
+    private func loggingDestination(_ sheet: HomeLoggingSheet) -> some View {
+        switch sheet {
+        case .text(let initialText, let mealType, let autoAnalyze):
+            TextLoggingView(
+                service: foodService,
+                initialText: initialText,
+                initialMealType: mealType,
+                initialDate: Date(),
+                autoAnalyzeOnAppear: autoAnalyze,
+                onSwitchToPhoto: { activeSheet = .photo }
+            ) {
+                if autoAnalyze {
+                    quickInputText = ""
+                }
+                activeSheet = nil
                 reload()
             }
         case .photo:
@@ -409,9 +551,14 @@ public struct NutritionHomeView: View {
                 photoService: PhotoLoggingService(imageStore: imageStore, foodLogging: foodService),
                 foodService: foodService,
                 imageStore: imageStore,
-                onSwitchToText: { loggingRoute = .text }
+                onSwitchToText: { activeSheet = .text() }
             ) {
-                loggingRoute = nil
+                activeSheet = nil
+                reload()
+            }
+        case .manual(let entry):
+            MealConfirmationView(entry: entry, service: foodService, imageStore: imageStore) {
+                activeSheet = nil
                 reload()
             }
         }

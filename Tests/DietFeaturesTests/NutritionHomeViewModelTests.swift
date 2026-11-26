@@ -83,6 +83,77 @@ final class NutritionHomeViewModelTests {
         #expect(viewModel.errorMessage == PhasePlanValidationError.negativeMacroTarget.localizedDescription)
     }
 
+    @Test("Loading populates 7 weekly days, latest weight, and delta when weight records exist")
+    func loadPopulatesWeeklyDaysAndWeightDelta() throws {
+        let userProfile = profile()
+        try profileStore.saveProfile(
+            userProfile,
+            weightRecord: WeightRecord(
+                date: day(-4),
+                weightKilograms: 70.0,
+                createdAt: day(-4)
+            )
+        )
+        try profileStore.saveProfile(
+            userProfile,
+            weightRecord: WeightRecord(
+                date: today,
+                weightKilograms: 69.2,
+                createdAt: today.addingTimeInterval(60)
+            )
+        )
+        try profileStore.saveProfile(
+            userProfile,
+            weightRecord: WeightRecord(
+                date: today,
+                weightKilograms: 68.5,
+                createdAt: today.addingTimeInterval(120)
+            )
+        )
+        try phaseStore.saveNewPhase(PhasePlan(
+            phaseType: .maintenance,
+            startDate: day(-6),
+            version: 1,
+            energyStrategy: .automatic,
+            energyAdjustmentPercent: 0,
+            macroRule: .default
+        ))
+        let viewModel = makeViewModel()
+
+        viewModel.load()
+
+        #expect(viewModel.weeklyDays.count == 7)
+        #expect(viewModel.latestWeight?.weightKilograms == 68.5)
+        #expect(viewModel.weightDeltaText == "-1.5 kg / 4 天")
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test("Loading handles missing weight records and missing profile cleanly")
+    func loadHandlesMissingWeightRecordsAndMissingProfile() throws {
+        let viewModel = makeViewModel()
+
+        viewModel.load()
+        #expect(viewModel.weeklyDays.isEmpty)
+        #expect(viewModel.latestWeight == nil)
+        #expect(viewModel.weightDeltaText == nil)
+
+        try profileStore.saveProfile(profile(), weightRecord: nil)
+        try phaseStore.saveNewPhase(PhasePlan(
+            phaseType: .maintenance,
+            startDate: today,
+            version: 1,
+            energyStrategy: .automatic,
+            energyAdjustmentPercent: 0,
+            macroRule: .default
+        ))
+
+        viewModel.load()
+        #expect(viewModel.weeklyDays.count == 7)
+        #expect(viewModel.latestWeight == nil)
+        #expect(viewModel.weightDeltaText == nil)
+        #expect(viewModel.errorMessage == nil)
+    }
+
     private var today: Date {
         Calendar.current.startOfDay(for: Date())
     }

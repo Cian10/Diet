@@ -40,7 +40,10 @@ DietApp 面向增肌、减脂、维持和休息／恢复阶段的日常饮食管
 - **七日趋势**：展示每日摄入、目标参考、记录完整度和体重变化，避免用单日波动推断长期趋势。
 - **AI 饮食分析**：主动选择近 7、14 或 30 天，将已确认的文字记录、每日营养汇总与目标发送给模型，获得约 600–900 字的可读纯文本分析；不上传图片或待确认记录。
 - **推荐与复盘**：根据本地规则生成饮食改善建议，并在周期复盘中提出待确认的目标调整。
-- **桌面体验**：原生 macOS 侧栏、宽窄窗口自适应布局、浅色／深色主题和可访问语义。
+- **静谧营养工作台（macOS 桌面体验）**：
+  - 原生 macOS 侧栏（4 个主导航项与底部个人资料栏，支持 `⌘1`–`⌘5` 快捷键）与统一工具栏（日期显示与 `+ 记一餐 ⌘N`）。
+  - 「今天」响应式双栏工作台（宽度 `≥ 840pt` 双栏、`< 840pt` 自动折叠为单列）：主营养仪表台展示剩余热量、45° 琥珀斜纹未知营养提示区与蛋白／碳水／脂肪三色条，配合无框餐食时间轴、行内 `⌘↩` 快速录入、右侧情境建议与近 7 日节奏柱形图。
+  - 浅色石纸白／深色石墨黑自适应色板（满足 WCAG AA 对比度），提供完整 VoiceOver 无障碍语义并尊重系统 Reduce Motion 设置。
 
 ## 每日目标自动化
 
@@ -73,9 +76,13 @@ DietApp 面向增肌、减脂、维持和休息／恢复阶段的日常饮食管
 
 ## 界面预览
 
-| 饮食日记 | 七日趋势 |
+| 今天（深色石墨黑） | 饮食日记 |
 | --- | --- |
-| <img src="docs/images/readme-diary.png" width="520" alt="DietApp 日记页面"> | <img src="docs/images/readme-trends.png" width="520" alt="DietApp 趋势页面"> |
+| <img src="docs/images/readme-today-dark.png" width="520" alt="DietApp 今天页面深色模式"> | <img src="docs/images/readme-diary.png" width="520" alt="DietApp 日记页面"> |
+
+| 七日趋势 |
+| --- |
+| <img src="docs/images/readme-trends.png" width="520" alt="DietApp 趋势页面"> |
 
 截图使用合成数据，不包含真实个人记录。
 
@@ -150,7 +157,7 @@ xcodebuild -project DietApp.xcodeproj \
 
 默认测试使用内存仓库，不访问真实剪贴板，也不调用真实模型供应商。测试脚本使用独立构建目录，避免与本地构建产物混用。
 
-截至 2026-11-25，默认模式已通过 89 项测试、20 个套件；SwiftData 模式已通过 92 项测试、21 个套件。完整 macOS Debug 构建、签名校验及目标自动生成／单日修改／AI 分析页面启动验收均已完成。真实模型供应商、图片导入和重启持久化仍需按人工清单验收。
+截至 2026-11-27，默认模式已通过 95 项测试、20 个套件；SwiftData 模式已通过 98 项测试、21 个套件。完整 macOS Debug 构建、签名校验及 Phase 1 静谧营养工作台（`960×640`／`1100×760`／`1280×800` 三档窗口尺寸、深浅色模式、6 条核心交互流与 VoiceOver 无障碍树）实机验收均已完成。真实模型供应商、图片导入和重启持久化仍需按人工清单验收。
 
 ## 工程结构
 
@@ -160,6 +167,7 @@ Sources/DietCore/          领域模型、营养与目标引擎、LLM 客户端�
 Sources/DietFeatures/      SwiftUI 页面、导航、设计系统与功能 ViewModel
 Tests/                     DietCore 与 DietFeatures 的自动化测试
 Scripts/                   工程生成与测试脚本
+design-system/             静谧营养工作台设计系统文档与 DTCG 令牌
 docs/                      产品、架构、UI、隐私和实施方案文档
 project.yml                XcodeGen 工程描述
 DietApp.xcodeproj          已生成的 Xcode 工程，可直接打开
@@ -212,6 +220,8 @@ DietApp.xcodeproj          已生成的 Xcode 工程，可直接打开
 - [macOS 桌面版迁移设计](docs/superpowers/specs/diet-app/14-macos-desktop.md)
 - [完整设计索引](docs/superpowers/specs/diet-app/2026-11-10-diet-app-design.md)
 - [每日目标自动化与 AI 饮食分析设计](docs/superpowers/specs/2026-11-25-target-auto-confirmation-ai-analysis-design.md)
+- [静谧营养工作台 Phase 1 实施方案](docs/superpowers/plans/2026-11-26-phase1-workbench-ui.md)
+- [静谧营养工作台设计系统](design-system/atelier-nutrition-desk/MASTER.md)
 
 ## 许可证
 

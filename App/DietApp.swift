@@ -63,7 +63,8 @@ struct DietApp: App {
             #endif
         }
         #if os(macOS)
-        .defaultSize(width: 1100, height: 760)
+        .defaultSize(width: 1120, height: 760)
+        .windowToolbarStyle(.unified)
         #endif
     }
 }

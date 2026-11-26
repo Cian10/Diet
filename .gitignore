@@ -13,3 +13,4 @@ xcuserdata/
 # Local Codex and brainstorming artifacts
 .codex/
 .superpowers/
+.codegraph/

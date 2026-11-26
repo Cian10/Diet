@@ -25,21 +25,36 @@ struct TodayTargetEditView: View {
             Form {
                 if let errorMessage {
                     Section {
-                        DietInlineNotice(.error, title: "无法保存今日目标", message: errorMessage)
+                        errorBanner(message: errorMessage)
                     }
                     .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
 
                 Section {
-                    editableNumberRow(title: "目标热量", unit: "kcal", text: $caloriesText)
+                    VStack(alignment: .leading, spacing: 6) {
+                        editableNumberRow(title: "目标热量", unit: "kcal", text: $caloriesText)
+                        if let estimatedCalories = estimatedMacroCalories {
+                            Text("按当前蛋白/碳水/脂肪折算约 \(DietFormat.calories(estimatedCalories))")
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(DietTheme.Palette.inkSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityLabel("宏量折算热量参考，约 \(DietFormat.calories(estimatedCalories))")
+                        }
+                    }
                     editableNumberRow(title: "蛋白质", unit: "g", text: $proteinText)
                     editableNumberRow(title: "碳水化合物", unit: "g", text: $carbohydrateText)
                     editableNumberRow(title: "脂肪", unit: "g", text: $fatText)
                 } header: {
                     Text("今日目标")
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
                 } footer: {
                     Text("仅修改今天的目标，不改变阶段方案，也不影响昨天或明天。")
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
                 }
+                .listRowBackground(DietTheme.Palette.surface)
+                .listRowSeparatorTint(DietTheme.Palette.hairline)
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
@@ -59,17 +74,66 @@ struct TodayTargetEditView: View {
         .frame(minWidth: 520, idealWidth: 580, minHeight: 420, idealHeight: 470)
     }
 
+    private var estimatedMacroCalories: Double? {
+        guard let protein = try? ProfileFormState.optionalDouble(proteinText, field: "蛋白质"),
+              let carbs = try? ProfileFormState.optionalDouble(carbohydrateText, field: "碳水化合物"),
+              let fat = try? ProfileFormState.optionalDouble(fatText, field: "脂肪"),
+              protein.isFinite, carbs.isFinite, fat.isFinite,
+              protein >= 0, carbs >= 0, fat >= 0 else {
+            return nil
+        }
+        return NutritionCalculator().energyFromMacros(
+            protein: protein,
+            carbohydrate: carbs,
+            fat: fat
+        )
+    }
+
+    private func errorBanner(message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.body)
+                .foregroundStyle(DietTheme.Palette.danger)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("无法保存今日目标")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(DietTheme.Palette.ink)
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(DietTheme.Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: DietTheme.Metrics.controlRadius + 2, style: .continuous)
+                .fill(DietTheme.Palette.dangerSoft)
+                .overlay {
+                    RoundedRectangle(cornerRadius: DietTheme.Metrics.controlRadius + 2, style: .continuous)
+                        .stroke(DietTheme.Palette.danger.opacity(0.35), lineWidth: 1)
+                }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     private func editableNumberRow(title: String, unit: String, text: Binding<String>) -> some View {
-        LabeledContent(title) {
+        LabeledContent {
             HStack(spacing: 6) {
                 TextField("", text: text)
                     .multilineTextAlignment(.trailing)
                     .monospacedDigit()
+                    .foregroundStyle(DietTheme.Palette.ink)
                     .accessibilityLabel(title)
                 Text(unit)
                     .foregroundStyle(DietTheme.Palette.inkSecondary)
                     .frame(width: 34, alignment: .leading)
             }
+        } label: {
+            Text(title)
+                .foregroundStyle(DietTheme.Palette.ink)
         }
     }
 

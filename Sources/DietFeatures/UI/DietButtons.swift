@@ -22,10 +22,32 @@ struct DietPrimaryButtonStyle: ButtonStyle {
 }
 
 struct DietSecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        DietSecondaryButtonBody(configuration: configuration)
+    }
+}
+
+struct DietTextButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        DietTextButtonBody(configuration: configuration)
+    }
+}
+
+private struct DietSecondaryButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+
+    @State private var isHovered = false
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    func makeBody(configuration: Configuration) -> some View {
+    private var fillColor: Color {
+        if !isEnabled || isHovered {
+            return DietTheme.Palette.surfaceMuted
+        }
+        return DietTheme.Palette.surface
+    }
+
+    var body: some View {
         configuration.label
             .font(.body.weight(.medium))
             .foregroundStyle(isEnabled ? DietTheme.Palette.ink : DietTheme.Palette.inkSecondary)
@@ -33,27 +55,45 @@ struct DietSecondaryButtonStyle: ButtonStyle {
             .frame(minHeight: DietTheme.Metrics.controlHeight)
             .background {
                 RoundedRectangle(cornerRadius: DietTheme.Metrics.controlRadius, style: .continuous)
-                    .fill(DietTheme.Palette.surface)
+                    .fill(fillColor)
                     .overlay {
                         RoundedRectangle(cornerRadius: DietTheme.Metrics.controlRadius, style: .continuous)
                             .stroke(DietTheme.Palette.border, lineWidth: 1)
                     }
             }
+            .contentShape(RoundedRectangle(cornerRadius: DietTheme.Metrics.controlRadius, style: .continuous))
+            .onHover { hovering in
+                isHovered = hovering
+            }
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isHovered)
     }
 }
 
-struct DietTextButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
+private struct DietTextButtonBody: View {
+    let configuration: ButtonStyleConfiguration
 
-    func makeBody(configuration: Configuration) -> some View {
+    @State private var isHovered = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
         configuration.label
             .font(.body.weight(.medium))
             .foregroundStyle(isEnabled ? DietTheme.Palette.primaryText : DietTheme.Palette.inkSecondary)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .background {
+                RoundedRectangle(cornerRadius: DietTheme.Metrics.controlRadius, style: .continuous)
+                    .fill(isEnabled && isHovered ? DietTheme.Palette.surfaceMuted : Color.clear)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: DietTheme.Metrics.controlRadius, style: .continuous))
             .opacity(configuration.isPressed ? 0.65 : 1)
+            .onHover { hovering in
+                isHovered = hovering
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isHovered)
     }
 }
 

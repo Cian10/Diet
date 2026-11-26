@@ -52,69 +52,122 @@ public final class RecommendationViewModel: ObservableObject {
 public struct RecommendationSectionView: View {
     @ObservedObject var viewModel: RecommendationViewModel
 
+    public init(viewModel: RecommendationViewModel) {
+        self.viewModel = viewModel
+    }
+
     public var body: some View {
-        DietCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    DietSectionHeader(title: "今日建议", subtitle: "由本地规则生成")
-                    Toggle("接下来有训练", isOn: $viewModel.hasUpcomingWorkout)
-                        .toggleStyle(.switch)
-                        .tint(DietTheme.Palette.primary)
-                        .font(.footnote)
-                        .onChange(of: viewModel.hasUpcomingWorkout) { _, _ in viewModel.load() }
-                }
-
-                if viewModel.recommendations.isEmpty {
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle")
-                            .foregroundStyle(DietTheme.Palette.primaryText)
-                            .accessibilityHidden(true)
-                        Text("确认今日目标后，这里会显示适合当前记录的建议。")
-                            .font(.footnote)
-                            .foregroundStyle(DietTheme.Palette.inkSecondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-
-                ForEach(Array(viewModel.recommendations.enumerated()), id: \.element.id) { index, recommendation in
-                    if index > 0 { Divider().overlay(DietTheme.Palette.border) }
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .top) {
-                            Text(recommendation.title)
-                                .font(.headline)
-                                .foregroundStyle(DietTheme.Palette.ink)
-                            Spacer()
-                            Button("忽略") { viewModel.dismiss(recommendation) }
-                                .buttonStyle(.dietText)
-                                .font(.caption)
-                        }
-                        Text(recommendation.reason)
-                            .font(.footnote)
-                            .foregroundStyle(DietTheme.Palette.inkSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        ForEach(recommendation.suggestions) { suggestion in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(suggestion.name) · \(suggestion.portionDescription)")
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(DietTheme.Palette.ink)
-                                Text("预计 \(DietFormat.calories(suggestion.expectedNutrition.calories))，蛋白质 \(DietFormat.grams(suggestion.expectedNutrition.proteinGrams))，碳水 \(DietFormat.grams(suggestion.expectedNutrition.carbohydrateGrams))")
-                                    .font(.caption)
-                                    .foregroundStyle(DietTheme.Palette.inkSecondary)
-                            }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background {
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(DietTheme.Palette.surfaceMuted)
-                            }
-                        }
-                    }
-                }
-
-                Text("食物营养使用 App 内置通用参考值；建议不会替代医疗意见。")
+        VStack(alignment: .leading, spacing: 12) {
+            DietGroupHeader("今日情境") {
+                Toggle("接下来有训练", isOn: $viewModel.hasUpcomingWorkout)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .tint(DietTheme.Palette.primary)
                     .font(.caption)
                     .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    .fixedSize()
+                    .onChange(of: viewModel.hasUpcomingWorkout) { _, _ in viewModel.load() }
+            }
+
+            if viewModel.recommendations.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(DietTheme.Palette.primaryText)
+                        .accessibilityHidden(true)
+                    Text("确认今日目标后将显示当前情境建议。")
+                        .font(.caption)
+                        .foregroundStyle(DietTheme.Palette.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(viewModel.recommendations.enumerated()), id: \.element.id) { index, recommendation in
+                        if index > 0 {
+                            DietHairline()
+                        }
+                        recommendationBlock(recommendation)
+                    }
+                }
+            }
+
+            Text("内置通用参考值，不替代医疗意见。")
+                .font(.caption)
+                .foregroundStyle(DietTheme.Palette.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func recommendationBlock(_ recommendation: Recommendation) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(recommendation.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DietTheme.Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 6)
+                Button {
+                    viewModel.dismiss(recommendation)
+                } label: {
+                    Text("忽略")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.dietText)
+                .accessibilityLabel("忽略建议：\(recommendation.title)")
+            }
+
+            Text(recommendation.reason)
+                .font(.caption)
+                .foregroundStyle(DietTheme.Palette.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !recommendation.suggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(recommendation.suggestions.enumerated()), id: \.element.id) { suggestionIndex, suggestion in
+                        if suggestionIndex > 0 {
+                            DietHairline()
+                        }
+                        suggestionRow(suggestion)
+                    }
+                }
             }
         }
+    }
+
+    private func suggestionRow(_ suggestion: FoodSuggestion) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(suggestion.name)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(DietTheme.Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(suggestion.portionDescription)
+                    .font(.caption)
+                    .foregroundStyle(DietTheme.Palette.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(macroSummary(for: suggestion))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(DietTheme.Palette.inkSecondary)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.vertical, 7)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(suggestionAccessibilityLabel(for: suggestion))
+    }
+
+    private func macroSummary(for suggestion: FoodSuggestion) -> String {
+        let kcal = DietFormat.number(suggestion.expectedNutrition.calories, maximumFractionDigits: 0)
+        let protein = DietFormat.number(suggestion.expectedNutrition.proteinGrams, maximumFractionDigits: 0)
+        return "\(kcal) kcal / P \(protein)g"
+    }
+
+    private func suggestionAccessibilityLabel(for suggestion: FoodSuggestion) -> String {
+        "\(suggestion.name)，\(suggestion.portionDescription)，约 \(DietFormat.calories(suggestion.expectedNutrition.calories))，蛋白质 \(DietFormat.grams(suggestion.expectedNutrition.proteinGrams))"
     }
 }
